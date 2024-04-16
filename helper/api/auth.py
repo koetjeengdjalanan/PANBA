@@ -31,7 +31,7 @@ class Login:
                 auth=HTTPBasicAuth(username=self.username, password=self.secret),
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "NTTIndonesia-PANBA/0.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/0.2.0",
                 },
             )
             res.raise_for_status()
