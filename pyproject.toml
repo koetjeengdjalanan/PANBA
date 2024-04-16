@@ -1,0 +1,9 @@
+[project]
+name = "PANBA-NTT"
+version = "0.2.0"
+description = "Retiteration from PaloAltoNetworkBulkAutomation"
+authors = [
+    { name = "Martin Sambulare", email = "martin.sambulare@nttindonesia.com" },
+]
+requires-python = ">=3.11.6"
+classifiers = ["Developers Status :: 3 - Alpha", "Natural Language :: English"]
