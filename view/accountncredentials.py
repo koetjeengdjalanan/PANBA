@@ -107,4 +107,5 @@ class AccountNCredentials(ctk.CTkFrame):
             )
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
-        print(profile.request())
+        resProfile = profile.request()
+        print(resProfile)

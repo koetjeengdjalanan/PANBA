@@ -59,7 +59,7 @@ class Profile:
                 url=self.url,
                 headers={
                     "Accept": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/0.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/0.2.0",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )
