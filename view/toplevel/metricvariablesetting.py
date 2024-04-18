@@ -1,4 +1,4 @@
-from tkinter import ANCHOR, messagebox
+from tkinter import messagebox
 import customtkinter as ctk
 
 from datetime import datetime as dt
@@ -17,14 +17,18 @@ class MetricVariableSetting(ctk.CTkToplevel):
         self.bearerToken = bearer_token
 
         ### Date Input ###
-        # self.dateTimeFrom = ctk.StringVar()
-        # self.hourTimeFrom = ctk.StringVar()
-        # self.minuteTimeFrom = ctk.StringVar()
-        # self.dateTimeTo = ctk.StringVar()
-        # self.hourTimeTo = ctk.StringVar()
-        # self.minuteTimeTo = ctk.StringVar()
+        self.now = dt.now()
+        self.dateTimeFrom = ctk.StringVar()
+        self.hourTimeFrom = ctk.StringVar(value=self.now.hour)
+        self.minuteTimeFrom = ctk.StringVar(value=self.now.minute)
+        self.dateTimeTo = ctk.StringVar()
+        self.hourTimeTo = ctk.StringVar(value=self.now.hour)
+        self.minuteTimeTo = ctk.StringVar(value=self.now.minute)
+        self.duration = ctk.StringVar(value="1day")
         self.dateInputFrame = ctk.CTkFrame(master=self)
         self.dateInputFrame.pack(fill=ctk.X, expand=True, padx=10, pady=10)
+        self.selected = []
+        self.bodyVars = {}
         ctk.CTkLabel(
             master=self.dateInputFrame,
             anchor=ctk.CENTER,
@@ -39,8 +43,21 @@ class MetricVariableSetting(ctk.CTkToplevel):
             master=self.dateInputFrame, fg_color="transparent"
         )
         self.dateInputFrameTo.pack(side=ctk.RIGHT, fill=ctk.X, expand=True)
-        inputFrom = self.__date_input(parent=self.dateInputFrameFrom, type="from")
-        inputTo = self.__date_input(parent=self.dateInputFrameTo, type="to")
+        inputFrom = self.__date_input(
+            parent=self.dateInputFrameFrom,
+            type="from",
+            date=self.dateTimeFrom,
+            hour=self.hourTimeFrom,
+            minute=self.minuteTimeFrom,
+        )
+        inputTo = self.__date_input(
+            parent=self.dateInputFrameTo,
+            type="to",
+            date=self.dateTimeTo,
+            hour=self.hourTimeTo,
+            minute=self.minuteTimeTo,
+        )
+        self.__duration_select()
 
         ### Choose Site ###
         self.siteListFrame = ctk.CTkScrollableFrame(master=self)
@@ -52,29 +69,65 @@ class MetricVariableSetting(ctk.CTkToplevel):
         ### Confirm Deny ###
         confirmationFrame = ctk.CTkFrame(master=self, fg_color="transparent")
         confirmationFrame.pack(fill=ctk.X, expand=True, padx=10, pady=(0, 10))
-        ctk.CTkButton(master=confirmationFrame, text="Confirm").pack(
-            side=ctk.RIGHT, padx=10
-        )
+        ctk.CTkButton(
+            master=confirmationFrame, text="Confirm", command=self.confirm
+        ).pack(side=ctk.RIGHT, padx=10)
         ctk.CTkButton(master=confirmationFrame, text="Cancel").pack(
             side=ctk.RIGHT, padx=10
         )
 
-    def __date_input(self, parent, type: str) -> None:
+    def __date_input(self, parent, type: str, date, hour, minute) -> None:
         ctk.CTkLabel(master=parent, text=type).grid(column=0, row=0, columnspan=3)
-        ctk.CTkLabel(master=parent, text="Date: ").grid(column=0, row=1, sticky=ctk.W)
-        dateTime = DateEntry(master=parent)
-        dateTime.grid(column=1, row=1, sticky=ctk.EW, columnspan=2)
-        ctk.CTkLabel(master=parent, text="Time: ").grid(column=0, row=2)
+        ctk.CTkLabel(master=parent, text="Date: ").grid(
+            column=0, row=1, pady=5, padx=5, sticky=ctk.W
+        )
+        dateTime = DateEntry(master=parent, textvariable=date)
+        dateTime.grid(column=1, row=1, pady=5, padx=5, sticky=ctk.EW, columnspan=2)
+        ctk.CTkLabel(master=parent, text="Time: ").grid(column=0, row=2, pady=5, padx=5)
         hourInput = ctk.CTkComboBox(
             master=parent,
             values=[str(x) for x in range(0, 24)],
+            width=100,
+            variable=hour,
         )
-        hourInput.grid(column=1, row=2)
+        hourInput.set(value=str(self.now.hour))
+        hourInput.grid(column=1, row=2, pady=5, padx=5)
         minuteInput = ctk.CTkComboBox(
             master=parent,
             values=[str(x) for x in range(0, 60)],
+            width=100,
+            variable=minute,
         )
-        minuteInput.grid(column=2, row=2)
+        minuteInput.set(value=str(self.now.minute))
+        minuteInput.grid(column=2, row=2, pady=5, padx=5)
+
+    def __duration_select(self):
+        durationList = (
+            ("Hourly", "1hour"),
+            ("Daily", "1day"),
+            ("Weekly", "1week"),
+            ("Monthly", "1month"),
+        )
+        durationFrame = ctk.CTkFrame(master=self)
+        durationFrame.pack(padx=10, pady=(0, 10))
+        col = 0
+        ctk.CTkLabel(master=durationFrame, text="Duration: ").grid(
+            row=0, column=col, pady=(5, 0), padx=(10, 0)
+        )
+        # ctk.CTkEntry(master=durationFrame, width=5, )
+        for duration in durationList:
+            col = col + 1
+            ctk.CTkRadioButton(
+                master=durationFrame,
+                text=duration[0],
+                variable=self.duration,
+                value=duration[1],
+            ).grid(
+                row=0,
+                column=col,
+                padx=5,
+                pady=5,
+            )
 
     def get_element_list(self):
         element = ElementOfTenant(bearer_token=self.bearerToken)
@@ -92,14 +145,44 @@ class MetricVariableSetting(ctk.CTkToplevel):
 
     def populate_element_list(self, data):
         for item in data["data"]["items"]:
-            ctk.CTkCheckBox(
-                master=self.siteListFrame,
-                text=item["name"],
-                command=lambda x=item: print([x["site_id"], x["id"]]),
-            ).pack(padx=10, pady=(5, 0), anchor=ctk.W)
+            cbState = ctk.BooleanVar()
+            cb = ctk.CTkCheckBox(
+                master=self.siteListFrame, text=item["name"], variable=cbState
+            )
+            cb.configure(
+                command=lambda x=item, cbx=cb: self.handle_selection(
+                    checkbox=cbx, item=x
+                )
+            )
+            cb.pack(padx=10, pady=(5, 0), anchor=ctk.W)
+
+    def handle_selection(self, checkbox, item) -> None:
+        if checkbox.get():
+            self.selected.append([item["site_id"], item["id"]])
+        else:
+            self.selected.remove([item["site_id"], item["id"]])
+        print(self.selected)
 
     def __define_time_range(self) -> list:
         return list(range(0, 24))
 
     def var_setting(self) -> dict:
         return {}
+
+    def confirm(self) -> dict:
+        self.bodyVars = {
+            "globalVars": {
+                "start_time": dt.strptime(
+                    f"{self.dateTimeFrom.get()} {self.hourTimeFrom.get()} {self.minuteTimeFrom.get()}",
+                    "%m/%d/%y %H %M",
+                ).isoformat(),
+                "end_time": dt.strptime(
+                    f"{self.dateTimeTo.get()} {self.hourTimeTo.get()} {self.minuteTimeTo.get()}",
+                    "%m/%d/%y %H %M",
+                ).isoformat(),
+                "interval": self.duration.get(),
+            },
+            "selected": self.selected,
+        }
+        self.winfo_toplevel().event_generate("<ConfirmSetting>")
+        return self.bodyVars
