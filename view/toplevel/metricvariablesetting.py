@@ -2,7 +2,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from datetime import datetime as dt
-from tkcalendar import Calendar, DateEntry
+from tkcalendar import DateEntry
 
 from helper.api.getlist import ElementOfTenant
 
@@ -14,7 +14,6 @@ class MetricVariableSetting(ctk.CTkToplevel):
         self.title("Metric Variable Setting")
         self.geometry("600*800")
         self.controller = controller
-        print(self.controller.controller.authRes["data"]["access_token"])
 
         ### Date Input ###
         self.now = dt.now()
@@ -27,6 +26,7 @@ class MetricVariableSetting(ctk.CTkToplevel):
         self.duration = ctk.StringVar(value="1day")
         self.dateInputFrame = ctk.CTkFrame(master=self)
         self.dateInputFrame.pack(fill=ctk.X, expand=True, padx=10, pady=10)
+        self.cbxVars = []
         self.selected = []
         ctk.CTkLabel(
             master=self.dateInputFrame,
@@ -42,14 +42,14 @@ class MetricVariableSetting(ctk.CTkToplevel):
             master=self.dateInputFrame, fg_color="transparent"
         )
         self.dateInputFrameTo.pack(side=ctk.RIGHT, fill=ctk.X, expand=True)
-        inputFrom = self.__date_input(
+        _ = self.__date_input(
             parent=self.dateInputFrameFrom,
             type="from",
             date=self.dateTimeFrom,
             hour=self.hourTimeFrom,
             minute=self.minuteTimeFrom,
         )
-        inputTo = self.__date_input(
+        _ = self.__date_input(
             parent=self.dateInputFrameTo,
             type="to",
             date=self.dateTimeTo,
@@ -71,9 +71,9 @@ class MetricVariableSetting(ctk.CTkToplevel):
         ctk.CTkButton(
             master=confirmationFrame, text="Confirm", command=self.confirm
         ).pack(side=ctk.RIGHT, padx=10)
-        ctk.CTkButton(master=confirmationFrame, text="Cancel").pack(
-            side=ctk.RIGHT, padx=10
-        )
+        ctk.CTkButton(
+            master=confirmationFrame, text="Cancel", command=self.__on_closed
+        ).pack(side=ctk.RIGHT, padx=10)
 
     def __date_input(self, parent, type: str, date, hour, minute) -> None:
         ctk.CTkLabel(master=parent, text=type).grid(column=0, row=0, columnspan=3)
@@ -146,8 +146,16 @@ class MetricVariableSetting(ctk.CTkToplevel):
         return res
 
     def populate_element_list(self, data):
+        self.selectAllVars = ctk.BooleanVar()
+        selectAll = ctk.CTkCheckBox(
+            master=self.siteListFrame, text="Select All", variable=self.selectAllVars
+        )
+        selectAll.configure(command=self.handle_select_all)
+        selectAll.pack(padx=10, pady=(5, 0), anchor=ctk.W)
         for item in data["data"]["items"]:
             cbState = ctk.BooleanVar()
+            self.cbxVars.append(cbState)
+            cbState.item = item
             cb = ctk.CTkCheckBox(
                 master=self.siteListFrame, text=item["name"], variable=cbState
             )
@@ -158,12 +166,16 @@ class MetricVariableSetting(ctk.CTkToplevel):
             )
             cb.pack(padx=10, pady=(5, 0), anchor=ctk.W)
 
+    def handle_select_all(self) -> None:
+        for cbx in self.cbxVars:
+            cbx.set(self.selectAllVars.get())
+            self.handle_selection(cbx, cbx.item)
+
     def handle_selection(self, checkbox, item) -> None:
         if checkbox.get():
             self.selected.append([item["site_id"], item["id"], item["name"]])
         else:
             self.selected.remove([item["site_id"], item["id"], item["name"]])
-        print(self.selected)
 
     def __define_time_range(self) -> list:
         return list(range(0, 24))
@@ -194,4 +206,3 @@ class MetricVariableSetting(ctk.CTkToplevel):
 
     def __on_closed(self):
         self.destroy()
-        print("Closed Windows")

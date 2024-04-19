@@ -102,12 +102,10 @@ class AccountNCredentials(ctk.CTkFrame):
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
         self.controller.authRes = auth.request()
-        # print(self.controller.authRes)
         try:
             profile = Profile(
                 bearer_token=self.controller.authRes["data"]["access_token"]
             )
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
-        resProfile = profile.request()
-        print(resProfile)
+        self.controller.resProfile = profile.request()
