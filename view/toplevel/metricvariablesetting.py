@@ -8,13 +8,13 @@ from helper.api.getlist import ElementOfTenant
 
 
 class MetricVariableSetting(ctk.CTkToplevel):
-    def __init__(self, master, bearer_token: str, data: dict = {}):
+    def __init__(self, master, controller):
         super().__init__(master=master)
         self.iconbitmap("./favicon.ico")
         self.title("Metric Variable Setting")
         self.geometry("600*800")
-        self.data = data
-        self.bearerToken = bearer_token
+        self.controller = controller
+        print(self.controller.controller.authRes["data"]["access_token"])
 
         ### Date Input ###
         self.now = dt.now()
@@ -28,7 +28,6 @@ class MetricVariableSetting(ctk.CTkToplevel):
         self.dateInputFrame = ctk.CTkFrame(master=self)
         self.dateInputFrame.pack(fill=ctk.X, expand=True, padx=10, pady=10)
         self.selected = []
-        self.bodyVars = {}
         ctk.CTkLabel(
             master=self.dateInputFrame,
             anchor=ctk.CENTER,
@@ -103,10 +102,11 @@ class MetricVariableSetting(ctk.CTkToplevel):
 
     def __duration_select(self):
         durationList = (
-            ("Hourly", "1hour"),
-            ("Daily", "1day"),
-            ("Weekly", "1week"),
-            ("Monthly", "1month"),
+            ("10 Sec", "10sec"),
+            ("1 Min", "1min"),
+            ("5 Min", "5min"),
+            ("1 Hour", "1hour"),
+            ("1 Day", "1day"),
         )
         durationFrame = ctk.CTkFrame(master=self)
         durationFrame.pack(padx=10, pady=(0, 10))
@@ -130,7 +130,9 @@ class MetricVariableSetting(ctk.CTkToplevel):
             )
 
     def get_element_list(self):
-        element = ElementOfTenant(bearer_token=self.bearerToken)
+        element = ElementOfTenant(
+            bearer_token=self.controller.controller.authRes["data"]["access_token"]
+        )
         try:
             res = element.request()
         except Exception as error:
@@ -158,9 +160,9 @@ class MetricVariableSetting(ctk.CTkToplevel):
 
     def handle_selection(self, checkbox, item) -> None:
         if checkbox.get():
-            self.selected.append([item["site_id"], item["id"]])
+            self.selected.append([item["site_id"], item["id"], item["name"]])
         else:
-            self.selected.remove([item["site_id"], item["id"]])
+            self.selected.remove([item["site_id"], item["id"], item["name"]])
         print(self.selected)
 
     def __define_time_range(self) -> list:
@@ -170,19 +172,26 @@ class MetricVariableSetting(ctk.CTkToplevel):
         return {}
 
     def confirm(self) -> dict:
-        self.bodyVars = {
+        self.controller.bodyVars = {
             "globalVars": {
                 "start_time": dt.strptime(
                     f"{self.dateTimeFrom.get()} {self.hourTimeFrom.get()} {self.minuteTimeFrom.get()}",
                     "%m/%d/%y %H %M",
-                ).isoformat(),
+                ).isoformat()
+                + ".000Z",
                 "end_time": dt.strptime(
                     f"{self.dateTimeTo.get()} {self.hourTimeTo.get()} {self.minuteTimeTo.get()}",
                     "%m/%d/%y %H %M",
-                ).isoformat(),
+                ).isoformat()
+                + ".000Z",
                 "interval": self.duration.get(),
             },
             "selected": self.selected,
         }
-        self.winfo_toplevel().event_generate("<ConfirmSetting>")
-        return self.bodyVars
+        self.event_generate("<<ConfirmSetting>>")
+        self.__on_closed()
+        return self.controller.bodyVars
+
+    def __on_closed(self):
+        self.destroy()
+        print("Closed Windows")

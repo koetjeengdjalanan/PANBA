@@ -1,7 +1,10 @@
+import functools
+import json
 import tkinter as tk
 import customtkinter as ctk
 from datetime import datetime as dt, timedelta
 
+from helper.api.monitor import SysMetric
 from view.toplevel.metricvariablesetting import MetricVariableSetting
 
 
@@ -19,7 +22,12 @@ class DeviceMetric(ctk.CTkFrame):
         ]
         self.varSettingData = None
         self.bodyVars = {}
-        self.bind("<ConfirmSetting>", self.on_confirm())
+        self.metrics = [
+            {"name": "MemoryUsage", "statistics": ["average"], "unit": "percentage"},
+            {"name": "CPUUsage", "statistics": ["average"], "unit": "percentage"},
+            {"name": "DiskUsage", "statistics": ["average"], "unit": "percentage"},
+        ]
+        # self.bind("<<ConfirmSetting>>", lambda: self.on_confirm())
 
         ### Interval Overview ###
         self.settingFrame = ctk.CTkFrame(master=self)
@@ -34,29 +42,40 @@ class DeviceMetric(ctk.CTkFrame):
         ### Graph Window ###
         self.graphWindow = ctk.CTkScrollableFrame(master=self)
         self.graphWindow.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        self.settingButton = ctk.CTkButton(
-            master=self.graphWindow, text="Open Setting", command=self.open_var_setting
-        ).pack(anchor=ctk.CENTER)
+        # self.settingButton = ctk.CTkButton(
+        #     master=self.graphWindow, text="Open Setting", command=self.open_var_setting
+        # ).pack(anchor=ctk.CENTER)
+        ctk.CTkButton(
+            master=self.graphWindow, text="Render", command=self.on_confirm
+        ).grid(padx=10, pady=10, sticky=ctk.E, row=0)
 
     def open_var_setting(self, event=None):
         if self.varSetting is None or not self.varSetting.winfo_exists():
             self.varSetting = MetricVariableSetting(
                 master=self,
-                # bearer_token="asdasdasd",
-                bearer_token=self.controller.authRes["data"]["access_token"],
+                controller=self,
+                # bearer_token=self.controller.authRes["data"]["access_token"],
                 # data=self.bodyVars,
             )
-            self.varSetting.focus_force()
-            self.varSettingData = self.varSetting.var_setting
+            self.varSetting.grab_set()
+            # self.varSettingData = self.varSetting.bodyVars
+            # print("Binding on_confirm to WM_DELETE_WINDOW")
+            self.varSetting.protocol(
+                "WM_DELETE_WINDOW", functools.partial(self.on_confirm)
+            )
         else:
             self.varSetting.focus()
 
     def on_confirm(self):
-        if self.varSetting is None or not self.varSetting.winfo_exists():
-            self.bodyVars = {}
-        else:
-            self.bodyVars = self.varSetting.bodyVars
-        print(self.bodyVars)
+        for element in self.bodyVars["selected"]:
+            bodyJson = self.bodyVars["globalVars"]
+            bodyJson["metrics"] = self.metrics
+            bodyJson["filter"] = {"site": [element[0]], "element": [element[1]]}
+            res = SysMetric(
+                bearer_token=self.controller.authRes["data"]["access_token"],
+                body=bodyJson,
+            )
+            print(res.request())
         # self.settingButton.destroy()
         # for child in self.graphWindow.winfo_children():
         #     child.destroy()

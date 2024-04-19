@@ -40,7 +40,7 @@ class Login:
             print(f"Http Error {httpError}")
             raise
         except requests.exceptions.RequestException as requestException:
-            print(f"Something Went Wrong {requestException} {res}")
+            print(f"Something Went Wrong {requestException}")
             raise
 
 
@@ -69,5 +69,5 @@ class Profile:
             print(f"Http Error {httpError}")
             raise
         except requests.exceptions.RequestException as requestException:
-            print(f"Something Went Wrong {requestException} {res}")
+            print(f"Something Went Wrong {requestException}")
             raise

@@ -70,7 +70,9 @@ class AccountNCredentials(ctk.CTkFrame):
             master=credentialsFrame, text="Log In", command=lambda: self.login()
         ).grid(pady=5, column=3, row=4, sticky="e")
         self.workingLabel = ctk.CTkLabel(master=credentialsFrame, text=None)
-        self.workingLabel.grid(padx=5, pady=5, column=0, row=5, sticky="w")
+        self.workingLabel.grid(
+            padx=5, pady=5, column=0, row=5, sticky="w", columnspan=4
+        )
 
         ### Populate Entry ###
         self.after(ms=10, func=self.__populate_entry)

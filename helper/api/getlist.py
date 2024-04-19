@@ -21,7 +21,7 @@ class SiteOfTenant:
             res.raise_for_status()
             return {"status": res.status_code, "data": res.json()}
         except requests.exceptions.HTTPError as httpError:
-            print(f"Http Error {httpError} {res.headers}")
+            print(f"Http Error {httpError} {res.headers} {res.json()}")
             raise
         except requests.exceptions.RequestException as requestException:
             print(f"Something Went Wrong {requestException} {res}")
@@ -48,7 +48,7 @@ class ElementOfTenant:
             res.raise_for_status()
             return {"status": res.status_code, "data": res.json()}
         except requests.exceptions.HTTPError as httpError:
-            print(f"Http Error {httpError} {res.headers}")
+            print(f"Http Error {httpError} {res.headers} {res.json()}")
             raise
         except requests.exceptions.RequestException as requestException:
             print(f"Something Went Wrong {requestException} {res}")
