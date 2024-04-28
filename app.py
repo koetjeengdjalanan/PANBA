@@ -43,6 +43,7 @@ class App(ctk.CTk):
             frame.place(relx=0.2, rely=0, relwidth=0.8, relheight=1)
 
         self.show_page(container=AccountNCredentials)
+        # self.show_page(container=DeviceMetric)
 
     def show_page(self, container):
         frame = self.frames[container]

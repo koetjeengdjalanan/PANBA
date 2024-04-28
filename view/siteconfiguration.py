@@ -4,7 +4,7 @@ import pandas as pd
 
 from tkinter import messagebox
 from tksheet import Sheet
-from helper.api.getlist import Download
+from helper.api.getlist import SiteOfTenant
 from helper.filehandler import FileHandler
 
 
@@ -73,7 +73,7 @@ class SiteConfiguration(ctk.CTkFrame):
             self.filePickerEntry.insert(0, file)
 
     def download_list(self) -> None:
-        download = Download(
+        download = SiteOfTenant(
             bearer_token=self.controller.authRes["data"]["access_token"]
         )
         try:

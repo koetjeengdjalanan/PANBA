@@ -31,7 +31,7 @@ class Login:
                 auth=HTTPBasicAuth(username=self.username, password=self.secret),
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "NTTIndonesia-PANBA/0.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/0.2.0",
                 },
             )
             res.raise_for_status()
@@ -40,7 +40,7 @@ class Login:
             print(f"Http Error {httpError}")
             raise
         except requests.exceptions.RequestException as requestException:
-            print(f"Something Went Wrong {requestException} {res}")
+            print(f"Something Went Wrong {requestException}")
             raise
 
 
@@ -59,7 +59,7 @@ class Profile:
                 url=self.url,
                 headers={
                     "Accept": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/0.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/0.2.0",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )
@@ -69,5 +69,5 @@ class Profile:
             print(f"Http Error {httpError}")
             raise
         except requests.exceptions.RequestException as requestException:
-            print(f"Something Went Wrong {requestException} {res}")
+            print(f"Something Went Wrong {requestException}")
             raise
