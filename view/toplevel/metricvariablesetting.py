@@ -1,7 +1,7 @@
 from tkinter import messagebox
 import customtkinter as ctk
 
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 from tkcalendar import DateEntry
 
 from helper.api.getlist import ElementOfTenant
@@ -17,10 +17,10 @@ class MetricVariableSetting(ctk.CTkToplevel):
 
         ### Date Input ###
         self.now = dt.now()
-        self.dateTimeFrom = ctk.StringVar()
+        self.dateTimeFrom = ctk.StringVar(value=self.now - timedelta(days=30))
         self.hourTimeFrom = ctk.StringVar(value=self.now.hour)
         self.minuteTimeFrom = ctk.StringVar(value=self.now.minute)
-        self.dateTimeTo = ctk.StringVar()
+        self.dateTimeTo = ctk.StringVar(value=self.now)
         self.hourTimeTo = ctk.StringVar(value=self.now.hour)
         self.minuteTimeTo = ctk.StringVar(value=self.now.minute)
         self.duration = ctk.StringVar(value="1day")
