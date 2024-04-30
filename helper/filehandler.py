@@ -110,6 +110,12 @@ class FileHandler:
             "utf_8_sig",
         ]
 
+    def select_directory(self) -> str:
+        destDirectory = fd.askdirectory(
+            initialdir="~", mustexist=True, title="Select Directory / Folder"
+        )
+        return destDirectory
+
     def select_file(self) -> str:
         filetype = (
             ("Excel Files", "*.xls *.xlsx *.xlsm *.xlsb"),
@@ -118,7 +124,7 @@ class FileHandler:
         )
 
         self.sourcefile = fd.askopenfilename(
-            title="Open Source File", initialdir="/", filetypes=filetype
+            title="Open Source File", initialdir="~", filetypes=filetype
         )
 
         handlefile = self.handling_file()
@@ -175,7 +181,7 @@ class FileHandler:
         )
         return {}
 
-    def save_as_excel(self, data: list, flatten: bool = False) -> None:
+    def save_as_excel(self, data: list, flatten: bool = False, directory: str = '~') -> None:
         # print(type(data), data, sep="\n")
         fileLoc = fd.asksaveasfilename(
             defaultextension=".xlsx",
@@ -183,7 +189,7 @@ class FileHandler:
                 ("Excel Files", "*.xls *.xlsx *.xlsm *.xlsb"),
                 ("All Files", "*.*"),
             ),
-            initialdir="~",
+            initialdir=directory,
             initialfile=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_Tenant_List",
             title="Export as Excel File",
         )

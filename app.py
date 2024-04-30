@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from layout.sidebar import SideBar
 from view.accountncredentials import AccountNCredentials
+from view.bulkmetricreporting import BulkMetricReporting
 from view.devicehealth import DeviceHealth
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
@@ -16,7 +17,7 @@ class App(ctk.CTk):
         self.iconbitmap("./favicon.ico")
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
-        # self.resizable(False, False)
+        self.resizable(False, False)
         self.env = env if not None else None
         self.frames = {}
         self.authRes = None
@@ -27,6 +28,7 @@ class App(ctk.CTk):
             ["Account & Credentials", AccountNCredentials],
             ["Site Configuration", SiteConfiguration],
             ["Device's Metric", DeviceMetric],
+            ["Bulk Metric Reporting", BulkMetricReporting],
             ["Device's Health", DeviceHealth],
         ]
         for menu in menu_list:
