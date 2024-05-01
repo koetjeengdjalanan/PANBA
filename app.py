@@ -17,7 +17,7 @@ class App(ctk.CTk):
         self.iconbitmap("./favicon.ico")
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
-        self.resizable(False, False)
+        # self.resizable(False, False)
         self.env = env if not None else None
         self.frames = {}
         self.authRes = None

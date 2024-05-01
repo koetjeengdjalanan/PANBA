@@ -9,7 +9,7 @@ import pandas as pd
 from tkinter import messagebox
 from tkcalendar import DateEntry
 from threading import Thread
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
 from dateutil.relativedelta import relativedelta as rdt
 
 from helper.api.getlist import ElementOfTenant
@@ -30,11 +30,11 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
         self.dateDuration = ctk.IntVar(value=3)
         self.metrics = [
-            {
-                "name": "InterfaceBandwidthUsage",
-                "statistics": ["average"],
-                "unit": "Mbps",
-            },
+            # {
+            #     "name": "InterfaceBandwidthUsage",
+            #     "statistics": ["average"],
+            #     "unit": "Mbps",
+            # },
             {"name": "CPUUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "MemoryUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "DiskUsage", "statistics": ["average"], "unit": "percentage"},
@@ -175,7 +175,26 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.FH.save_as_excel(data=self.siteList, directory=self.destDirectory)
 
     def automate(self) -> None:
-        data = array_split(ary=self.siteList, indices_or_sections=4)
+        # numRows, numCols = self.siteList.shape
+        # smallerNumRows = numRows // 2
+        # smallerNumCols = numCols // 2
+        # proc0 = Thread(
+        #     target=self.iterate_site,
+        #     args=(self.siteList.iloc[:smallerNumRows, :smallerNumCols],),
+        # )
+        # proc1 = Thread(
+        #     target=self.iterate_site,
+        #     args=(self.siteList.iloc[:smallerNumRows, smallerNumCols:],),
+        # )
+        # proc2 = Thread(
+        #     target=self.iterate_site,
+        #     args=(self.siteList.iloc[smallerNumRows:, :smallerNumCols],),
+        # )
+        # proc3 = Thread(
+        #     target=self.iterate_site,
+        #     args=(self.siteList.iloc[smallerNumRows:, smallerNumCols:],),
+        # )
+        data = array_split(ary=self.siteList[:4], indices_or_sections=4)
         proc0 = Thread(target=self.iterate_site, args=(data[0],))
         proc1 = Thread(target=self.iterate_site, args=(data[1],))
         proc2 = Thread(target=self.iterate_site, args=(data[2],))
@@ -186,6 +205,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         proc3.start()
 
     def iterate_site(self, siteList: pd.DataFrame) -> None:
+        # print(siteList)
         for index, row in siteList.iterrows():
             print(f"Working for: {index} - {row['name']}\n")
             self.render_canvas(site=row["name"], tenant=row.to_dict())
@@ -206,6 +226,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             "metrics": self.metrics,
             "filter": {"site": [tenant["site_id"]], "element": [tenant["id"]]},
         }
+        print(payload)
         SM = SysMetric(
             bearer_token=self.controller.authRes["data"]["access_token"], body=payload
         )

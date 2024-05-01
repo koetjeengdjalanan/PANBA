@@ -1,32 +1,34 @@
-import customtkinter as ctk
+import pandas as pd
+
+# Sample DataFrame
+data = {
+    "A": [1, 2, 3, 4, 5],
+    "B": [6, 7, 8, 9, 10],
+    "C": [11, 12, 13, 14, 15],
+    "D": [16, 17, 18, 19, 20],
+}
+
+df = pd.DataFrame(data)
 
 
-class CustomLabelFrame(ctk.CTkFrame):
-    def __init__(self, master=None, label="", **kwargs):
-        super().__init__(master, **kwargs)
-        self.label = label
-        self.label_frame = ctk.CTkFrame(self)
-        self.label_widget = ctk.CTkLabel(self.label_frame, text=self.label)
-        self.label_widget.pack(side="top", fill="x", pady=5)
-        self.label_frame.pack(fill="both", expand=True, padx=5, pady=5)
-
-    def add_widget(self, widget, **kwargs):
-        widget.pack(**kwargs, padx=5, pady=5)
-        widget.master = self.label_frame
+def split_dataframe(df):
+    num_rows, num_cols = df.shape
+    smaller_num_rows = num_rows // 2
+    smaller_num_cols = num_cols // 2
+    df1 = df.iloc[:smaller_num_rows, :smaller_num_cols]
+    df2 = df.iloc[:smaller_num_rows, smaller_num_cols:]
+    df3 = df.iloc[smaller_num_rows:, :smaller_num_cols]
+    df4 = df.iloc[smaller_num_rows:, smaller_num_cols:]
+    return df1, df2, df3, df4
 
 
-# Example usage:
-if __name__ == "__main__":
-    root = ctk.CTk()
-    root.geometry("300x200")
+df1, df2, df3, df4 = split_dataframe(df)
 
-    custom_frame = CustomLabelFrame(root, label="My LabelFrame")
-    custom_frame.pack(fill="both", expand=True)
-
-    button1 = ctk.CTkButton(custom_frame.label_frame, text="Button 1")
-    button2 = ctk.CTkButton(custom_frame.label_frame, text="Button 2")
-
-    custom_frame.add_widget(button1, side="left")
-    custom_frame.add_widget(button2, side="right")
-
-    root.mainloop()
+print("DataFrame 1:")
+print(df1)
+print("\nDataFrame 2:")
+print(df2)
+print("\nDataFrame 3:")
+print(df3)
+print("\nDataFrame 4:")
+print(df4)
