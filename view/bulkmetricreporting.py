@@ -25,10 +25,11 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.FH = FileHandler()
         self.siteList = None
         self.now = dt.now()
-        self.agoDate = self.now - rdt(months=3)
+        defaultDiff: int = 90
+        self.agoDate = self.now - rdt(days=defaultDiff - 1)
         self.dateInput = ctk.StringVar(value=self.now.strftime(format="%m/%d/%Y"))
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
-        self.dateDuration = ctk.IntVar(value=3)
+        self.dateDuration = ctk.IntVar(value=defaultDiff)
         self.metrics = [
             {"name": "CPUUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "MemoryUsage", "statistics": ["average"], "unit": "percentage"},
@@ -118,22 +119,22 @@ class BulkMetricReporting(ctk.CTkFrame):
         ctk.CTkLabel(master=parent, text="Duration:").grid(
             column=0, row=2, padx=5, pady=5, sticky=ctk.W
         )
-        self.durationLabel = ctk.CTkLabel(master=parent, text="3 Month(s)")
+        self.durationLabel = ctk.CTkLabel(master=parent, text="90 Day(s)")
         self.durationLabel.grid(column=2, row=2, padx=5, pady=5, sticky=ctk.E)
         self.dateSlider = ctk.CTkSlider(
             master=parent,
             from_=1,
-            to=6,
-            number_of_steps=5,
+            to=90,
+            number_of_steps=89,
             variable=self.dateDuration,
             command=self.date_ago_pick,
         )
         self.dateSlider.grid(column=1, row=2, padx=5, pady=5, sticky=ctk.EW)
 
     def date_ago_pick(self, event=None) -> None:
-        self.agoDate = self.now - rdt(months=self.dateSlider.get())
+        self.agoDate = self.now - rdt(days=(self.dateSlider.get() - 1))
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
-        self.durationLabel.configure(text=f"{int(self.dateSlider.get())} Month(s)")
+        self.durationLabel.configure(text=f"{int(self.dateSlider.get())} Day(s)")
 
     def get_site_list(self) -> None:
         element = ElementOfTenant(
@@ -194,7 +195,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         #     target=self.iterate_site,
         #     args=(self.siteList.iloc[smallerNumRows:, smallerNumCols:],),
         # )
-        data = array_split(ary=self.siteList, indices_or_sections=4)
+        data = array_split(ary=self.siteList[:4], indices_or_sections=4)
         proc0 = Thread(target=self.iterate_site, args=(data[0],))
         proc1 = Thread(target=self.iterate_site, args=(data[1],))
         proc2 = Thread(target=self.iterate_site, args=(data[2],))
@@ -207,8 +208,9 @@ class BulkMetricReporting(ctk.CTkFrame):
     def iterate_site(self, siteList: pd.DataFrame) -> None:
         # print(siteList)
         for index, row in siteList.iterrows():
-            print(f"Working for: {index} - {row['name']}\n")
+            print(f"Working for  : {index} - {row['name']}\n")
             self.render_canvas(site=row["name"], tenant=row.to_dict())
+            print(f"Generated for: {index} - {row['name']}\n")
 
     def generate_data(self, tenant: dict) -> dict:
         payload = {
@@ -253,11 +255,11 @@ class BulkMetricReporting(ctk.CTkFrame):
                 ax.text(
                     x=0.5,
                     y=0.5,
-                    s="PANBA V0.2.0 by NTT Indonesia",
+                    s="PANBA V0.2.0 by NTT Data Indonesia",
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
-                    alpha=0.2,
+                    alpha=0.1,
                     zorder=-1,
                     rotation=30,
                     fontsize=30,
@@ -270,20 +272,32 @@ class BulkMetricReporting(ctk.CTkFrame):
                     linestyle="solid",
                     label=metric["series"][0]["name"],
                 )
-                for percent in maxPercentage, minPercentage:
-                    ax.plot(
-                        percent,
-                        data.loc[percent]["value"],
-                        "r^",
-                        label="Max Percentile",
-                    )
-                    ax.annotate(
-                        f"{percent.strftime('%d %b')}, {data.loc[percent]['value']:.2f}",
-                        (percent, data.loc[percent]["value"]),
-                        xytext=(0, 5),
-                        textcoords="offset points",
-                        ha="left",
-                    )
+                ax.plot(
+                    maxPercentage,
+                    data.loc[maxPercentage]["value"],
+                    "r^",
+                    label="Max Percentile",
+                )
+                ax.annotate(
+                    f"{maxPercentage.strftime('%d %b')}, {data.loc[maxPercentage]['value']:.2f}",
+                    (maxPercentage, data.loc[maxPercentage]["value"]),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="left",
+                )
+                ax.plot(
+                    minPercentage,
+                    data.loc[minPercentage]["value"],
+                    "gv",
+                    label="Min Percentile",
+                )
+                ax.annotate(
+                    f"{minPercentage.strftime('%d %b')}, {data.loc[minPercentage]['value']:.2f}",
+                    (minPercentage, data.loc[minPercentage]["value"]),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="left",
+                )
                 ax.grid(visible=True, which="both", linestyle=":")
                 ax.set_xlabel("Dates")
                 ax.xaxis.set_minor_locator(mdates.DayLocator())
