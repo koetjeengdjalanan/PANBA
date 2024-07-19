@@ -30,14 +30,14 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
         self.dateDuration = ctk.IntVar(value=3)
         self.metrics = [
-            # {
-            #     "name": "InterfaceBandwidthUsage",
-            #     "statistics": ["average"],
-            #     "unit": "Mbps",
-            # },
             {"name": "CPUUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "MemoryUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "DiskUsage", "statistics": ["average"], "unit": "percentage"},
+            {
+                "name": "InterfaceBandwidthUsage",
+                "statistics": ["average"],
+                "unit": "Mbps",
+            },
         ]
 
         ### Output Dir ###
@@ -194,7 +194,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         #     target=self.iterate_site,
         #     args=(self.siteList.iloc[smallerNumRows:, smallerNumCols:],),
         # )
-        data = array_split(ary=self.siteList[:4], indices_or_sections=4)
+        data = array_split(ary=self.siteList, indices_or_sections=4)
         proc0 = Thread(target=self.iterate_site, args=(data[0],))
         proc1 = Thread(target=self.iterate_site, args=(data[1],))
         proc2 = Thread(target=self.iterate_site, args=(data[2],))
@@ -226,7 +226,6 @@ class BulkMetricReporting(ctk.CTkFrame):
             "metrics": self.metrics,
             "filter": {"site": [tenant["site_id"]], "element": [tenant["id"]]},
         }
-        print(payload)
         SM = SysMetric(
             bearer_token=self.controller.authRes["data"]["access_token"], body=payload
         )
@@ -234,7 +233,11 @@ class BulkMetricReporting(ctk.CTkFrame):
         return res
 
     def render_canvas(self, site: str, tenant) -> None:
-        rawData = self.generate_data(tenant=tenant)
+        try:
+            rawData = self.generate_data(tenant=tenant)
+        except Exception as error:
+            print(error, file=sys.stderr)
+            return None
         if not os.path.exists(f"{self.destDirectory}/{site}"):
             os.makedirs(f"{self.destDirectory}/{site}")
         for metric in rawData["data"]["metrics"]:
