@@ -23,6 +23,7 @@ class App(ctk.CTk):
         self.authRes = None
 
         ### Side Bar ###
+        # FIXME: Other menu still accessible even in not a dev environment
         sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
         menu_list = [
             ["Account & Credentials", AccountNCredentials],

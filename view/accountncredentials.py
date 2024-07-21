@@ -27,7 +27,9 @@ class AccountNCredentials(ctk.CTkFrame):
                 name="PAN Logo", file="./assets/PANLogo(Dark).png"
             ).subsample(3, 3),
             text=None,
-        ).pack(anchor="center", fill="x", expand=True)
+        ).pack(
+            anchor="center", fill="x", expand=True
+        )  # BUG: Change this to CTKImage somehow
 
         ### Credentials Input ###
         credentialsFrame = ctk.CTkFrame(master=self, fg_color="transparent")
@@ -89,7 +91,7 @@ class AccountNCredentials(ctk.CTkFrame):
             self.tsgIdField.insert(index=0, string=self.controller.env["tsgId"])
 
     def login(self) -> None:
-        # FIXME: Failed Login is still broken
+        # BUG: Failed Login is still broken
         if (
             self.nameField.get() or self.secretField.get() or self.tsgIdField.get()
         ) is None or "":

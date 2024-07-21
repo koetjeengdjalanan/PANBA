@@ -47,6 +47,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.outputDirEntry = ctk.CTkEntry(
             master=outputDirFrame,
             placeholder_text="Output Directory ...",
+            state=ctk.DISABLED,
         )  # TODO: Make Text Entry change value on Input
         self.outputDirEntry.pack(pady=10, padx=10, side="left", fill="x", expand=True)
         ctk.CTkButton(
@@ -106,9 +107,11 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     def pick_dest_dir(self) -> None:
         self.destDirectory = self.FH.select_directory()
+        self.outputDirEntry.configure(state=ctk.NORMAL)
         if self.destDirectory != "":
             self.outputDirEntry.delete(0, ctk.END)
             self.outputDirEntry.insert(0, self.destDirectory)
+        self.outputDirEntry.configure(state=ctk.DISABLED)
 
     def date_picker(self, parent) -> None:
         ctk.CTkLabel(master=parent, text="Choose Date:").grid(
