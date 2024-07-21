@@ -89,6 +89,7 @@ class AccountNCredentials(ctk.CTkFrame):
             self.tsgIdField.insert(index=0, string=self.controller.env["tsgId"])
 
     def login(self) -> None:
+        # FIXME: Failed Login is still broken
         if (
             self.nameField.get() or self.secretField.get() or self.tsgIdField.get()
         ) is None or "":

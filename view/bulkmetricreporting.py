@@ -47,7 +47,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.outputDirEntry = ctk.CTkEntry(
             master=outputDirFrame,
             placeholder_text="Output Directory ...",
-        )
+        )  # TODO: Make Text Entry change value on Input
         self.outputDirEntry.pack(pady=10, padx=10, side="left", fill="x", expand=True)
         ctk.CTkButton(
             master=outputDirFrame,
@@ -176,25 +176,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.FH.save_as_excel(data=self.siteList, directory=self.destDirectory)
 
     def automate(self) -> None:
-        # numRows, numCols = self.siteList.shape
-        # smallerNumRows = numRows // 2
-        # smallerNumCols = numCols // 2
-        # proc0 = Thread(
-        #     target=self.iterate_site,
-        #     args=(self.siteList.iloc[:smallerNumRows, :smallerNumCols],),
-        # )
-        # proc1 = Thread(
-        #     target=self.iterate_site,
-        #     args=(self.siteList.iloc[:smallerNumRows, smallerNumCols:],),
-        # )
-        # proc2 = Thread(
-        #     target=self.iterate_site,
-        #     args=(self.siteList.iloc[smallerNumRows:, :smallerNumCols],),
-        # )
-        # proc3 = Thread(
-        #     target=self.iterate_site,
-        #     args=(self.siteList.iloc[smallerNumRows:, smallerNumCols:],),
-        # )
+        # TODO: Add shared variable with Race Condition in Mind
         data = array_split(ary=self.siteList[:4], indices_or_sections=4)
         proc0 = Thread(target=self.iterate_site, args=(data[0],))
         proc1 = Thread(target=self.iterate_site, args=(data[1],))
@@ -204,6 +186,10 @@ class BulkMetricReporting(ctk.CTkFrame):
         proc1.start()
         proc2.start()
         proc3.start()
+        proc0.join()
+        proc1.join()
+        proc2.join()
+        proc3.join()
 
     def iterate_site(self, siteList: pd.DataFrame) -> None:
         # print(siteList)
