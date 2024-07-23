@@ -1,14 +1,15 @@
 import os
+import queue
 import sys
+import threading
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from numpy import array_split
 import pandas as pd
 
+from numpy import array_split
 from tkinter import messagebox
 from tkcalendar import DateEntry
-from threading import Thread
 from datetime import datetime as dt
 from dateutil.relativedelta import relativedelta as rdt
 
@@ -23,6 +24,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         super().__init__(master=master, fg_color="transparent", corner_radius=None)
         self.controller = controller
         self.FH = FileHandler()
+        self.queuedRes = queue.Queue()
         self.siteList = None
         self.now = dt.now()
         defaultDiff: int = 90
@@ -30,6 +32,8 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.dateInput = ctk.StringVar(value=self.now.strftime(format="%m/%d/%Y"))
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
         self.dateDuration = ctk.IntVar(value=defaultDiff)
+        self.pendingRes = []
+        self.threadLock = threading.Lock()
         self.metrics = [
             {"name": "CPUUsage", "statistics": ["average"], "unit": "percentage"},
             {"name": "MemoryUsage", "statistics": ["average"], "unit": "percentage"},
@@ -148,28 +152,46 @@ class BulkMetricReporting(ctk.CTkFrame):
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
             pass
-        get = Thread(target=self.process_site_list, args=(res,))
+        get = threading.Thread(target=self.process_site_list, args=(res,))
         get.start()
+        isThreadDone = False
+        while not isThreadDone:
+            isThreadDone = self.controller.after(
+                100, lambda: self.thread_is_done(worker=get)
+            )
+
+    def thread_is_done(self, worker: threading.Thread) -> bool:
+        if worker.is_alive():
+            return False
+        else:
+            worker.join()
+            return True
 
     def process_site_list(self, data) -> None:
         id = []
         siteId = []
         name = []
+        modelName = []
+        hwId = []
         softwareVersion = []
         serialNumber = []
         for item in data["data"]["items"]:
             id.append(item["id"])
             siteId.append(item["site_id"])
             name.append(item["name"])
+            modelName.append(item["model_name"])
+            hwId.append(item["hw_id"])
             softwareVersion.append(item["software_version"])
             serialNumber.append(item["serial_number"])
         self.siteList = pd.DataFrame(
             data={
                 "id": id,
                 "site_id": siteId,
-                "name": name,
-                "software_version": softwareVersion,
                 "serial_number": serialNumber,
+                "name": name,
+                "model_name": modelName,
+                "software_version": softwareVersion,
+                "hw_id": hwId,
             }
         )
         self.safeDataButton.configure(state=ctk.ACTIVE)
@@ -180,25 +202,39 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     def automate(self) -> None:
         # TODO: Add shared variable with Race Condition in Mind
-        data = array_split(ary=self.siteList[:4], indices_or_sections=4)
-        proc0 = Thread(target=self.iterate_site, args=(data[0],))
-        proc1 = Thread(target=self.iterate_site, args=(data[1],))
-        proc2 = Thread(target=self.iterate_site, args=(data[2],))
-        proc3 = Thread(target=self.iterate_site, args=(data[3],))
-        proc0.start()
-        proc1.start()
-        proc2.start()
-        proc3.start()
-        proc0.join()
-        proc1.join()
-        proc2.join()
-        proc3.join()
+        threadCount: int = 4
+        data: list = array_split(
+            ary=self.siteList[:16],
+            indices_or_sections=threadCount,
+        )  # HACK: Get Only first 16 for dev purposes
+        self.queuedRes = queue.Queue()
+        workingThreads = []
+        for _ in range(threadCount):
+            worker = threading.Thread(target=self.iterate_site, args=(data[_],))
+            worker.start()
+            workingThreads.append(worker)
+        self.controller.after(
+            100, lambda: self.automate_thread_is_done(workers=workingThreads)
+        )
+
+    def automate_thread_is_done(self, workers: list) -> None:
+        isAllDone: bool = all(not worker.is_alive() for worker in workers)
+        while not self.queuedRes.empty():
+            tempRes = self.queuedRes.get()
+            with self.threadLock:
+                self.pendingRes.append(tempRes)
+        if not isAllDone:
+            self.controller.after(
+                100, lambda: self.automate_thread_is_done(workers=workers)
+            )
+        else:
+            self.FH.save_as_excel(data=self.pendingRes, directory=self.destDirectory)
 
     def iterate_site(self, siteList: pd.DataFrame) -> None:
-        # print(siteList)
         for index, row in siteList.iterrows():
             print(f"Working for  : {index} - {row['name']}\n")
-            self.render_canvas(site=row["name"], tenant=row.to_dict())
+            res: dict = self.render_canvas(site=row["name"], tenant=row.to_dict())
+            self.queuedRes.put(res)
             print(f"Generated for: {index} - {row['name']}\n")
 
     def generate_data(self, tenant: dict) -> dict:
@@ -223,14 +259,18 @@ class BulkMetricReporting(ctk.CTkFrame):
         res = SM.request()
         return res
 
-    def render_canvas(self, site: str, tenant) -> None:
+    def render_canvas(self, site: str, tenant) -> dict:
         try:
             rawData = self.generate_data(tenant=tenant)
         except Exception as error:
             print(error, file=sys.stderr)
-            return None
+            raise ValueError(error)
         if not os.path.exists(f"{self.destDirectory}/{site}"):
             os.makedirs(f"{self.destDirectory}/{site}")
+        res = {
+            "element_id": tenant["id"],
+            "name": site,
+        }
         for metric in rawData["data"]["metrics"]:
             try:
                 data = pd.DataFrame(
@@ -307,3 +347,5 @@ class BulkMetricReporting(ctk.CTkFrame):
             except Exception as error:
                 print(error, file=sys.stderr)
             plt.close()
+            res[metric["series"][0]["name"]] = data["value"].mean()
+        return res
