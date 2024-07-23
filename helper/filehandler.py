@@ -181,18 +181,31 @@ class FileHandler:
         )
         return {}
 
-    def save_as_excel(self, data: list, flatten: bool = False, directory: str = '~') -> None:
+    def save_as_excel(
+        self,
+        data: list,
+        flatten: bool = False,
+        directory: str = "~",
+        includeTimeStamp: bool = True,
+        fileName: str = "PANBA_EXPORT",
+        promptDialog: bool = True,
+    ) -> None:
         # print(type(data), data, sep="\n")
-        fileLoc = fd.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=(
-                ("Excel Files", "*.xls *.xlsx *.xlsm *.xlsb"),
-                ("All Files", "*.*"),
-            ),
-            initialdir=directory,
-            initialfile=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_Tenant_List",
-            title="Export as Excel File",
-        )
+        if includeTimeStamp:
+            fileName = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}-{fileName}"
+        if promptDialog:
+            fileLoc = fd.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=(
+                    ("Excel Files", "*.xls *.xlsx *.xlsm *.xlsb"),
+                    ("All Files", "*.*"),
+                ),
+                initialdir=directory,
+                initialfile=fileName,
+                title="Export as Excel File",
+            )
+        else:
+            fileLoc = f"{directory}/{fileName}.xlsx"
         if fileLoc is not None or "":
             # pd.read_json(data).to_excel(fileLoc)
             if flatten:
@@ -203,7 +216,9 @@ class FileHandler:
                 pd.DataFrame(data=data).to_excel(
                     excel_writer=fileLoc, index=False, header=True
                 )
-            showinfo(title="File Saved", message=f"File Saved to {fileLoc}")
+            if promptDialog:
+                showinfo(title="File Saved", message=f"File Saved to {fileLoc}")
+            print(f"Exported: {fileLoc}")
 
     def flatten_dict(
         self, data: dict, parent_key: str = "", sep: str = "_", level: int = 1

@@ -154,18 +154,6 @@ class BulkMetricReporting(ctk.CTkFrame):
             pass
         get = threading.Thread(target=self.process_site_list, args=(res,))
         get.start()
-        isThreadDone = False
-        while not isThreadDone:
-            isThreadDone = self.controller.after(
-                100, lambda: self.thread_is_done(worker=get)
-            )
-
-    def thread_is_done(self, worker: threading.Thread) -> bool:
-        if worker.is_alive():
-            return False
-        else:
-            worker.join()
-            return True
 
     def process_site_list(self, data) -> None:
         id = []
@@ -198,13 +186,15 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.automateReport.configure(state=ctk.ACTIVE)
 
     def save_data(self) -> None:
-        self.FH.save_as_excel(data=self.siteList, directory=self.destDirectory)
+        self.FH.save_as_excel(
+            data=self.siteList, directory=self.destDirectory, fileName="site_list"
+        )
 
     def automate(self) -> None:
-        # TODO: Add shared variable with Race Condition in Mind
         threadCount: int = 4
         data: list = array_split(
-            ary=self.siteList[:16],
+            # ary=self.siteList[:16],
+            ary=self.siteList,
             indices_or_sections=threadCount,
         )  # HACK: Get Only first 16 for dev purposes
         self.queuedRes = queue.Queue()
@@ -228,7 +218,12 @@ class BulkMetricReporting(ctk.CTkFrame):
                 100, lambda: self.automate_thread_is_done(workers=workers)
             )
         else:
-            self.FH.save_as_excel(data=self.pendingRes, directory=self.destDirectory)
+            self.FH.save_as_excel(
+                data=self.pendingRes,
+                directory=self.destDirectory,
+                fileName="site_list_with_resource_metric",
+                promptDialog=False,
+            )
 
     def iterate_site(self, siteList: pd.DataFrame) -> None:
         for index, row in siteList.iterrows():
@@ -259,7 +254,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         res = SM.request()
         return res
 
-    def render_canvas(self, site: str, tenant) -> dict:
+    def render_canvas(self, site: str, tenant: dict) -> dict:
         try:
             rawData = self.generate_data(tenant=tenant)
         except Exception as error:
@@ -267,10 +262,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             raise ValueError(error)
         if not os.path.exists(f"{self.destDirectory}/{site}"):
             os.makedirs(f"{self.destDirectory}/{site}")
-        res = {
-            "element_id": tenant["id"],
-            "name": site,
-        }
+        res = tenant
         for metric in rawData["data"]["metrics"]:
             try:
                 data = pd.DataFrame(
