@@ -27,7 +27,9 @@ class AccountNCredentials(ctk.CTkFrame):
                 name="PAN Logo", file="./assets/PANLogo(Dark).png"
             ).subsample(3, 3),
             text=None,
-        ).pack(anchor="center", fill="x", expand=True)
+        ).pack(
+            anchor="center", fill="x", expand=True
+        )  # BUG: Change this to CTKImage somehow
 
         ### Credentials Input ###
         credentialsFrame = ctk.CTkFrame(master=self, fg_color="transparent")
@@ -66,9 +68,9 @@ class AccountNCredentials(ctk.CTkFrame):
             fg_color="gray25",
             hover_color="grey22",
         ).grid(pady=5, column=2, row=4, sticky="e")
-        ctk.CTkButton(
-            master=credentialsFrame, text="Log In", command=lambda: self.login()
-        ).grid(pady=5, column=3, row=4, sticky="e")
+        ctk.CTkButton(master=credentialsFrame, text="Log In", command=self.login).grid(
+            pady=5, column=3, row=4, sticky="e"
+        )
         self.workingLabel = ctk.CTkLabel(master=credentialsFrame, text=None)
         self.workingLabel.grid(
             padx=5, pady=5, column=0, row=5, sticky="w", columnspan=4
@@ -89,6 +91,15 @@ class AccountNCredentials(ctk.CTkFrame):
             self.tsgIdField.insert(index=0, string=self.controller.env["tsgId"])
 
     def login(self) -> None:
+        # BUG: Failed Login is still broken
+        if (
+            self.nameField.get() or self.secretField.get() or self.tsgIdField.get()
+        ) is None or "":
+            self.workingLabel.configure(
+                require_redraw=True,
+                text="Please fill credentials",
+                text_color="lightgreen",
+            )
         self.workingLabel.configure(require_redraw=True, text="Logging In...")
         try:
             auth = Login(

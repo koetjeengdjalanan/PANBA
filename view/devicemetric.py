@@ -95,6 +95,7 @@ class DeviceMetric(ctk.CTkFrame):
         data: list,
         title: str = "Uname Plot",
     ) -> None:
+        # FIXME: Render Canvas is still on previous iteration
         fig, axs = plt.subplots(
             nrows=len(data),
             ncols=1,

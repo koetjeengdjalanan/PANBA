@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from layout.sidebar import SideBar
 from view.accountncredentials import AccountNCredentials
+from view.bulkmetricreporting import BulkMetricReporting
 from view.devicehealth import DeviceHealth
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
@@ -22,11 +23,13 @@ class App(ctk.CTk):
         self.authRes = None
 
         ### Side Bar ###
+        # FIXME: Other menu still accessible even in not a dev environment
         sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
         menu_list = [
             ["Account & Credentials", AccountNCredentials],
             ["Site Configuration", SiteConfiguration],
             ["Device's Metric", DeviceMetric],
+            ["Bulk Metric Reporting", BulkMetricReporting],
             ["Device's Health", DeviceHealth],
         ]
         for menu in menu_list:
