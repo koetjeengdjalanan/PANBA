@@ -1,7 +1,9 @@
 import customtkinter as ctk
 from tkinter import PhotoImage, messagebox
+from PIL import Image
 
 from helper.api.auth import Login, Profile
+from assets.getfile import GetFile
 
 
 class AccountNCredentials(ctk.CTkFrame):
@@ -14,6 +16,7 @@ class AccountNCredentials(ctk.CTkFrame):
         )
         self.root.pack(fill="both", expand=True)
         self.controller = controller
+        self.getFile = GetFile
         # print(self.controller.env)
 
         username = ctk.StringVar()
@@ -21,15 +24,20 @@ class AccountNCredentials(ctk.CTkFrame):
         tsgId = ctk.StringVar()
 
         ### Logo ###
+        logo = ctk.CTkImage(
+            dark_image=Image.open(
+                self.getFile.getAssets(file_name="PANLogo(Dark).png")
+            ),
+            light_image=Image.open(self.getFile.getAssets(file_name="PANLogo.png")),
+            size=(700, 128),
+        )
         ctk.CTkLabel(
             master=self.root,
-            image=PhotoImage(
-                name="PAN Logo", file="./assets/PANLogo(Dark).png"
-            ).subsample(3, 3),
+            image=logo,
             text=None,
         ).pack(
             anchor="center", fill="x", expand=True
-        )  # BUG: Change this to CTKImage somehow
+        )  # [x]: Change this to CTKImage somehow
 
         ### Credentials Input ###
         credentialsFrame = ctk.CTkFrame(master=self, fg_color="transparent")
@@ -77,7 +85,8 @@ class AccountNCredentials(ctk.CTkFrame):
         )
 
         ### Populate Entry ###
-        self.after(ms=10, func=self.__populate_entry)
+        if self.controller.env is not None or "":
+            self.after(ms=10, func=self.__populate_entry)
 
     def __populate_entry(self) -> None:
         if self.controller.env["userName"] is not None or "":

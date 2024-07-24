@@ -10,9 +10,7 @@ from helper.api.getlist import ElementOfTenant
 class MetricVariableSetting(ctk.CTkToplevel):
     def __init__(self, master, controller):
         super().__init__(master=master)
-        self.iconbitmap("./favicon.ico")
         self.title("Metric Variable Setting")
-        self.geometry("600*800")
         self.controller = controller
 
         ### Date Input ###

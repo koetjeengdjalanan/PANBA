@@ -9,15 +9,17 @@ from view.bulkmetricreporting import BulkMetricReporting
 from view.devicehealth import DeviceHealth
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
+from assets.getfile import GetFile
 
 
 class App(ctk.CTk):
     def __init__(self, start_size: tuple[int], env: dict = None):
         super().__init__()
-        self.iconbitmap("./favicon.ico")
+        favicon = GetFile.getAssets(file_name="favicon.ico")
+        self.iconbitmap(favicon)
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
-        # self.resizable(False, False)
+        self.resizable(False, False)
         self.env = env if not None else None
         self.frames = {}
         self.authRes = None
