@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from layout.sidebar import SideBar
 from view.accountncredentials import AccountNCredentials
+from view.bandwidthconsumption import BandwidthConsumption
 from view.bulkmetricreporting import BulkMetricReporting
-from view.devicehealth import DeviceHealth
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
 from assets.getfile import GetFile
@@ -32,7 +32,7 @@ class App(ctk.CTk):
             ["Site Configuration", SiteConfiguration],
             ["Device's Metric", DeviceMetric],
             ["Bulk Metric Reporting", BulkMetricReporting],
-            ["Device's Health", DeviceHealth],
+            ["Bandwidth Consumption", BandwidthConsumption],
         ]
         for menu in menu_list:
             ctk.CTkButton(
@@ -47,8 +47,7 @@ class App(ctk.CTk):
             self.frames[menu[1]] = frame
             frame.place(relx=0.2, rely=0, relwidth=0.8, relheight=1)
 
-        self.show_page(container=AccountNCredentials)
-        # self.show_page(container=DeviceMetric)
+        self.show_page(container=BandwidthConsumption)
 
     def show_page(self, container):
         frame = self.frames[container]

@@ -53,3 +53,35 @@ class ElementOfTenant:
         except requests.exceptions.RequestException as requestException:
             print(f"Something Went Wrong {requestException} {res}")
             raise
+
+
+class RemoteNetworkBandwidth:
+    def __init__(
+        self,
+        bearer_token: str,
+        body: dict,
+        base_url: str = "https://pa-sg01.api.prismaaccess.com",
+    ) -> None:
+        self.body = body
+        self.baseUrl = base_url
+        self.beareToken = bearer_token
+
+    def request(self):
+        try:
+            res = requests.post(
+                url=f"{self.baseUrl}/api/sase/v3.0/resource/query/sites/rn_list",
+                data=self.body,
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": "NTTIndonesia-PANBA/0.2.0",
+                    "Authorization": f"Bearer {self.bearerToken}",
+                },
+            )
+            res.raise_for_status()
+            return {"status": res.status_code, "data": res.json()}
+        except requests.exceptions.HTTPError as httpError:
+            print(f"Http Error {httpError} {res.headers} {res.json()}")
+            raise
+        except requests.exceptions.RequestException as requestException:
+            print(f"Something Went Wrong {requestException} {res}")
+            raise

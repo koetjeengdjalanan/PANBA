@@ -16,7 +16,8 @@ from dateutil.relativedelta import relativedelta as rdt
 from helper.api.getlist import ElementOfTenant
 from helper.api.monitor import SysMetric
 from helper.filehandler import FileHandler
-from helper.terminalredirect import StdErrTerminalRedirect, StdOutTerminalRedirect
+
+# from helper.terminalredirect import StdErrTerminalRedirect, StdOutTerminalRedirect
 
 
 class BulkMetricReporting(ctk.CTkFrame):
@@ -106,8 +107,8 @@ class BulkMetricReporting(ctk.CTkFrame):
         logFrame.pack(fill=ctk.BOTH, padx=10, pady=(0, 10), expand=True)
         self.logTerminal = ctk.CTkTextbox(master=logFrame, wrap="none")
         self.logTerminal.pack(fill=ctk.BOTH, padx=10, pady=10, expand=True)
-        sys.stdout = StdOutTerminalRedirect(widget=self.logTerminal)
-        sys.stderr = StdErrTerminalRedirect(widget=self.logTerminal)
+        # sys.stdout = StdOutTerminalRedirect(widget=self.logTerminal)
+        # sys.stderr = StdErrTerminalRedirect(widget=self.logTerminal)
 
     def pick_dest_dir(self) -> None:
         self.destDirectory = self.FH.select_directory()
