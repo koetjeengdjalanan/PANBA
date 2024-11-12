@@ -1,6 +1,6 @@
-from datetime import datetime as dt
 import customtkinter as ctk
 import operator
+import helper.logwriter as lw
 from helper.settings.apisettings import BWConsSetting
 
 
@@ -44,13 +44,17 @@ class BandwidthConsumption(ctk.CTkFrame):
         )
         ctk.CTkEntry(master=outputFrame).pack(fill=ctk.X, expand=True, pady=5)
         ctk.CTkButton(
-            master=outputFrame, text="Browse", command=lambda: self.writeLog("Browse")
+            master=outputFrame,
+            text="Browse",
+            command=lambda: lw.text_view_render(widget=self.logBox, log="Browse"),
         ).pack(fill=ctk.X, expand=True, pady=5)
         ctk.CTkLabel(master=outputFrame, text="Output Format").pack(
             fill=ctk.X, expand=True, pady=5
         )
         ctk.CTkButton(
-            master=outputFrame, text="Export", command=lambda: self.writeLog("Export")
+            master=outputFrame,
+            text="Export",
+            command=lambda: lw.text_view_render(widget=self.logBox, log="Export"),
         ).pack(fill=ctk.X, expand=True, pady=5)
 
     def __prop_select(self):
@@ -83,9 +87,3 @@ class BandwidthConsumption(ctk.CTkFrame):
                 pady=(0, 5),
                 padx=5,
             )
-
-    def writeLog(self, log: str):
-        self.logBox.configure(state="normal")
-        self.logBox.insert(ctk.END, f"[ {dt.now():%d-%m-%Y %H:%M:%S} ] {log} \n\n")
-        self.logBox.configure(state="disabled")
-        self.logBox.see(ctk.END)
