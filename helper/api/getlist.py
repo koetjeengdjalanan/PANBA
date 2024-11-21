@@ -1,4 +1,5 @@
 import requests
+from json import dumps
 
 
 class SiteOfTenant:
@@ -60,23 +61,25 @@ class RemoteNetworkBandwidth:
         self,
         bearer_token: str,
         body: dict,
-        base_url: str = "https://pa-sg01.api.prismaaccess.com",
+        base_url: str = "https://pa-id01.api.prismaaccess.com",
     ) -> None:
         self.body = body
         self.baseUrl = base_url
-        self.beareToken = bearer_token
+        self.bearerToken = bearer_token
 
     def request(self):
         try:
             res = requests.post(
                 url=f"{self.baseUrl}/api/sase/v3.0/resource/query/sites/rn_list",
-                data=self.body,
+                data=dumps(self.body),
                 headers={
                     "Accept": "application/json",
+                    "Content-Type": "application/json",
                     "User-Agent": "NTTIndonesia-PANBA/0.2.0",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )
+            print(res.request.headers)
             res.raise_for_status()
             return {"status": res.status_code, "data": res.json()}
         except requests.exceptions.HTTPError as httpError:
