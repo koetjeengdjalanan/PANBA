@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 from layout.sidebar import SideBar
 from view.accountncredentials import AccountNCredentials
+from view.bandwidthconsumption import BandwidthConsumption
 from view.bulkmetricreporting import BulkMetricReporting
-from view.devicehealth import DeviceHealth
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
 from assets.getfile import GetFile
@@ -15,8 +15,7 @@ from assets.getfile import GetFile
 class App(ctk.CTk):
     def __init__(self, start_size: tuple[int], env: dict = None):
         super().__init__()
-        favicon = GetFile.getAssets(file_name="favicon.ico")
-        self.iconbitmap(favicon)
+        self.iconbitmap(GetFile.getAssets(file_name="favicon.ico"))
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
         self.resizable(False, False)
@@ -32,7 +31,7 @@ class App(ctk.CTk):
             ["Site Configuration", SiteConfiguration],
             ["Device's Metric", DeviceMetric],
             ["Bulk Metric Reporting", BulkMetricReporting],
-            ["Device's Health", DeviceHealth],
+            ["Bandwidth Consumption", BandwidthConsumption],
         ]
         for menu in menu_list:
             ctk.CTkButton(
@@ -48,7 +47,6 @@ class App(ctk.CTk):
             frame.place(relx=0.2, rely=0, relwidth=0.8, relheight=1)
 
         self.show_page(container=AccountNCredentials)
-        # self.show_page(container=DeviceMetric)
 
     def show_page(self, container):
         frame = self.frames[container]

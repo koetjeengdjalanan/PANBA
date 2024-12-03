@@ -7,8 +7,16 @@ class GetFile:
     Get path of assets properly
     """
 
-    def getAssets(file_name: str):
-        if hasattr(sys, "__MEIPASS"):
-            return os.path.join(sys._MEIPASS, "assets", file_name)
+    @staticmethod
+    def getAssets(file_name: str) -> str:
+        if hasattr(sys, "_MEIPASS"):
+            path = os.path.join(sys._MEIPASS, "assets", file_name)
         else:
-            return os.path.join("assets", file_name)
+            path = os.path.join(os.path.dirname(__file__), "..", "assets", file_name)
+
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"The asset file '{file_name}' does not exist at path '{path}'"
+            )
+
+        return path

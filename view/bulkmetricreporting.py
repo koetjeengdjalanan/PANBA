@@ -6,6 +6,7 @@ import customtkinter as ctk
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
+import helper.logwriter as lw
 
 from numpy import array_split
 from tkinter import messagebox
@@ -16,7 +17,6 @@ from dateutil.relativedelta import relativedelta as rdt
 from helper.api.getlist import ElementOfTenant
 from helper.api.monitor import SysMetric
 from helper.filehandler import FileHandler
-from helper.terminalredirect import StdErrTerminalRedirect, StdOutTerminalRedirect
 
 
 class BulkMetricReporting(ctk.CTkFrame):
@@ -104,15 +104,16 @@ class BulkMetricReporting(ctk.CTkFrame):
         ### Log Frame ###
         logFrame = ctk.CTkFrame(master=self)
         logFrame.pack(fill=ctk.BOTH, padx=10, pady=(0, 10), expand=True)
-        self.logTerminal = ctk.CTkTextbox(master=logFrame, wrap="none")
+        self.logTerminal = ctk.CTkTextbox(
+            master=logFrame, wrap="none", state="disabled"
+        )
         self.logTerminal.pack(fill=ctk.BOTH, padx=10, pady=10, expand=True)
-        sys.stdout = StdOutTerminalRedirect(widget=self.logTerminal)
-        sys.stderr = StdErrTerminalRedirect(widget=self.logTerminal)
 
     def pick_dest_dir(self) -> None:
-        self.destDirectory = self.FH.select_directory()
+        self.destDirectory = self.FH.select_directory().initDir
         self.outputDirEntry.configure(state=ctk.NORMAL)
         if self.destDirectory != "":
+            self.FH.destDir = self.destDirectory
             self.outputDirEntry.delete(0, ctk.END)
             self.outputDirEntry.insert(0, self.destDirectory)
         self.outputDirEntry.configure(state=ctk.DISABLED)
@@ -186,15 +187,18 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.automateReport.configure(state=ctk.ACTIVE)
 
     def save_data(self) -> None:
-        self.FH.save_as_excel(
-            data=self.siteList, directory=self.destDirectory, fileName="site_list"
+        self.FH.save_file_loc(dirStr=self.destDirectory).export_excel(
+            data=self.siteList
+        )
+        lw.text_view_render(
+            widget=self.logTerminal, log="file saved: " + str(self.FH.savedFile)
         )
 
     def automate(self) -> None:
         threadCount: int = 4
         data: list = array_split(
-            # ary=self.siteList[:16],
-            ary=self.siteList,
+            ary=self.siteList[:16],
+            # ary=self.siteList,
             indices_or_sections=threadCount,
         )  # HACK: Get Only first 16 for dev purposes
         self.queuedRes = queue.Queue()
@@ -218,19 +222,25 @@ class BulkMetricReporting(ctk.CTkFrame):
                 100, lambda: self.automate_thread_is_done(workers=workers)
             )
         else:
-            self.FH.save_as_excel(
-                data=self.pendingRes,
-                directory=self.destDirectory,
-                fileName="site_list_with_resource_metric",
+            self.FH.save_file_loc(
+                fileName="site_list_with_resource_metric.xlsx",
                 promptDialog=False,
+                dirStr=self.destDirectory,
+            ).export_excel(data=pd.DataFrame(self.pendingRes)).open_explorer()
+            lw.text_view_render(
+                widget=self.logTerminal, log="All Done!, Excel File exported"
             )
 
     def iterate_site(self, siteList: pd.DataFrame) -> None:
         for index, row in siteList.iterrows():
-            print(f"Working for  : {index} - {row['name']}\n")
+            lw.text_view_render(
+                widget=self.logTerminal, log=f"Working for  : {index} - {row['name']}"
+            )
             res: dict = self.render_canvas(site=row["name"], tenant=row.to_dict())
             self.queuedRes.put(res)
-            print(f"Generated for: {index} - {row['name']}\n")
+            lw.text_view_render(
+                widget=self.logTerminal, log=f"Generated for: {index} - {row['name']}"
+            )
 
     def generate_data(self, tenant: dict) -> dict:
         payload = {
@@ -258,7 +268,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         try:
             rawData = self.generate_data(tenant=tenant)
         except Exception as error:
-            print(error, file=sys.stderr)
+            lw.text_view_render(widget=self.logTerminal, log=error, file=sys.stderr)
             raise ValueError(error)
         if not os.path.exists(f"{self.destDirectory}/{site}"):
             os.makedirs(f"{self.destDirectory}/{site}")
@@ -276,7 +286,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                 ax.text(
                     x=0.5,
                     y=0.5,
-                    s="PANBA V0.2.0 by NTT Data Indonesia",
+                    s="PANBA V1.1.0 by NTT Data Indonesia",
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
@@ -333,11 +343,11 @@ class BulkMetricReporting(ctk.CTkFrame):
                     metadata={
                         "Title": f"{site}-{metric['series'][0]['name']}",
                         "Copyright": "Reserved By: NTT Indonesia",
-                        "Software": "PANBA V0.2.0 by NTT Indonesia",
+                        "Software": "PANBA V1.1.0 by NTT Indonesia",
                     },
                 )
             except Exception as error:
-                print(error, file=sys.stderr)
+                lw.text_view_render(widget=self.logTerminal, log=error, file=sys.stderr)
             plt.close()
             res[metric["series"][0]["name"]] = data["value"].mean()
         return res
