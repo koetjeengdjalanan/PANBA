@@ -286,7 +286,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                 ax.text(
                     x=0.5,
                     y=0.5,
-                    s="PANBA V0.2.0 by NTT Data Indonesia",
+                    s="PANBA V1.1.0 by NTT Data Indonesia",
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
@@ -343,7 +343,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                     metadata={
                         "Title": f"{site}-{metric['series'][0]['name']}",
                         "Copyright": "Reserved By: NTT Indonesia",
-                        "Software": "PANBA V0.2.0 by NTT Indonesia",
+                        "Software": "PANBA V1.1.0 by NTT Indonesia",
                     },
                 )
             except Exception as error:
