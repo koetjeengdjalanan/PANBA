@@ -57,6 +57,7 @@ def environment() -> dict | None:
     load_dotenv(dotenv_path="./.env")
     if Path("./.env").is_file():
         return {
+            "dev": os.getenv("DEV"),
             "userName": os.getenv("USER_NAME"),
             "secret": os.getenv("SECRET_STRING"),
             "tsgId": os.getenv("TSG_ID"),
