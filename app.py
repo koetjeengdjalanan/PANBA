@@ -37,10 +37,8 @@ class App(ctk.CTk):
 
     def activate_menu(self) -> None:
         for child in self.sideBar.winfo_children():
-            child.destroy()
-        for menu in self.menuList:
-            menu[2] = True
-        self.after(ms=10, func=self.__draw_menu)
+            if isinstance(child, ctk.CTkButton):
+                child.configure(state=ctk.NORMAL)
 
     def __draw_menu(self):
         for menu in self.menuList:
