@@ -17,7 +17,7 @@ REM Compiling script
     --company-name=NTTIndonesia^
     --product-name=PANBA^
     --file-version=0.5.0^
-    --product-version=1.1.0^
+    --product-version=1.2.5^
     --include-data-dir=assets=assets^
     --output-dir=%OUTPUT_DIR%^
     --disable-console^

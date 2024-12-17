@@ -161,8 +161,15 @@ class BulkMetricReporting(ctk.CTkFrame):
         ctk.CTkLabel(master=parent, text="Choose Date:").grid(
             column=0, row=1, padx=5, pady=5, sticky=ctk.W
         )
-        dateInput = DateEntry(master=parent, textvariable=self.dateInput)
+        dateInput = DateEntry(
+            master=parent,
+            textvariable=self.dateInput,
+            mindate=self.now - rdt(days=90),
+            maxdate=self.now,
+            showweeknumbers=False,
+        )
         dateInput.grid(column=1, row=1, padx=5, pady=5, columnspan=2, sticky=ctk.E)
+        dateInput.bind("<<DateEntrySelected>>", self.on_date_pick)
         ctk.CTkLabel(master=parent, text="Duration:").grid(
             column=0, row=2, padx=5, pady=5, sticky=ctk.W
         )
@@ -178,10 +185,21 @@ class BulkMetricReporting(ctk.CTkFrame):
         )
         self.dateSlider.grid(column=1, row=2, padx=5, pady=5, sticky=ctk.EW)
 
+    def on_date_pick(self, event=None) -> None:
+        maxDiff = 90 - (self.now - dt.strptime(self.dateInput.get(), "%m/%d/%y")).days
+        if self.dateDuration.get() > maxDiff:
+            self.dateDuration.set(maxDiff)
+        self.dateSlider.configure(
+            to=maxDiff, number_of_steps=maxDiff - 1, require_redraw=True
+        )
+        self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
+
     def date_ago_pick(self, event=None) -> None:
-        self.agoDate = self.now - rdt(days=(self.dateSlider.get() - 1))
+        self.agoDate = dt.strptime(self.dateInput.get(), "%m/%d/%y") - rdt(
+            days=(self.dateSlider.get() - 1)
+        )
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
-        self.durationLabel.configure(text=f"{int(self.dateSlider.get())} Day(s)")
+        self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
 
     def get_site_list(self) -> None:
         if self.controller.authRes is None:
@@ -246,7 +264,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.automateReport.configure(state=ctk.DISABLED)
         threadCount: int = 4
         data: list = array_split(
-            ary=self.siteList[:32],
+            ary=self.siteList,
             indices_or_sections=threadCount,
         )  # HACK: Get Only first (N) of items for dev purposes
         self.queuedRes = queue.Queue()
@@ -301,6 +319,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         for index, row in siteList.iterrows():
             isError = False
+            tempRes = pd.Series()
             start_time = time()
             lw.text_view_render(
                 widget=self.logTerminal, log=f"Working for  : {index} - {row['name']}"
@@ -389,7 +408,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                 ax.text(
                     x=0.5,
                     y=0.5,
-                    s="PANBA V1.1.0 by NTT Data Indonesia",
+                    s="PANBA V1.2.5 by NTT Data Indonesia",
                     horizontalalignment="center",
                     verticalalignment="center",
                     transform=ax.transAxes,
@@ -446,7 +465,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                     metadata={
                         "Title": f"{site}-{metric['series'][0]['name']}",
                         "Copyright": "Reserved By: NTT Indonesia",
-                        "Software": "PANBA V1.1.0 by NTT Indonesia",
+                        "Software": "PANBA V1.2.5 by NTT Indonesia",
                     },
                 )
             except Exception as error:

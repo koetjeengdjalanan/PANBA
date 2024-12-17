@@ -25,27 +25,37 @@ class App(ctk.CTk):
 
         ### Side Bar ###
         # FIXME: Other menu still accessible even in not a dev environment
-        sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
-        menu_list = [
-            ["Account & Credentials", AccountNCredentials],
-            ["Site Configuration", SiteConfiguration],
-            ["Device's Metric", DeviceMetric],
-            ["Bulk Metric Reporting", BulkMetricReporting],
-            ["Bandwidth Consumption", BandwidthConsumption],
+        self.sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
+        self.menuList: list[list] = [
+            ["Account & Credentials", AccountNCredentials, True],
+            ["Site Configuration", SiteConfiguration, False],
+            ["Device's Metric", DeviceMetric, False],
+            ["Bulk Metric Reporting", BulkMetricReporting, False],
+            ["Bandwidth Consumption", BandwidthConsumption, False],
         ]
-        for menu in menu_list:
+        self.__draw_menu()
+
+    def activate_menu(self) -> None:
+        for child in self.sideBar.winfo_children():
+            child.destroy()
+        for menu in self.menuList:
+            menu[2] = True
+        self.after(ms=10, func=self.__draw_menu)
+
+    def __draw_menu(self):
+        for menu in self.menuList:
             ctk.CTkButton(
-                master=sideBar,
+                master=self.sideBar,
                 text=menu[0],
+                state=ctk.NORMAL if menu[2] else ctk.DISABLED,
                 corner_radius=0,
-                bg_color="transparent",
                 fg_color="transparent",
+                text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"],
                 command=lambda x=menu[1]: self.show_page(container=x),
-            ).pack(fill="x", pady=1)
+            ).pack(fill=ctk.X, pady=1)
             frame = menu[1](master=self, controller=self)
             self.frames[menu[1]] = frame
             frame.place(relx=0.2, rely=0, relwidth=0.8, relheight=1)
-
         self.show_page(container=AccountNCredentials)
 
     def show_page(self, container):

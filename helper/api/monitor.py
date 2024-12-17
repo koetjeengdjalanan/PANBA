@@ -23,7 +23,7 @@ class SysMetric:
                     "X-PANW-Region": "sg",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )

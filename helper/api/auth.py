@@ -31,7 +31,7 @@ class Login:
                 auth=HTTPBasicAuth(username=self.username, password=self.secret),
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                 },
             )
             res.raise_for_status()
@@ -59,7 +59,7 @@ class Profile:
                 url=self.url,
                 headers={
                     "Accept": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )

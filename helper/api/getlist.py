@@ -15,7 +15,7 @@ class SiteOfTenant:
                 url=f"{self.baseUrl}/sdwan/v4.8/api/sites",
                 headers={
                     "Accept": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )
@@ -42,7 +42,7 @@ class ElementOfTenant:
                 url=f"{self.baseUrl}/sdwan/v3.1/api/elements",
                 headers={
                     "Accept": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )
@@ -75,7 +75,7 @@ class RemoteNetworkBandwidth:
                 headers={
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "User-Agent": "NTTIndonesia-PANBA/1.1.0",
+                    "User-Agent": "NTTIndonesia-PANBA/1.2.5",
                     "Authorization": f"Bearer {self.bearerToken}",
                 },
             )

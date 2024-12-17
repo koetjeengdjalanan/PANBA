@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import PhotoImage, messagebox
+from tkinter import messagebox
 from PIL import Image
 
 from helper.api.auth import Login, Profile
@@ -19,9 +19,10 @@ class AccountNCredentials(ctk.CTkFrame):
         self.getFile = GetFile
         # print(self.controller.env)
 
-        username = ctk.StringVar()
-        secret = ctk.StringVar()
-        tsgId = ctk.StringVar()
+        self.username = ctk.StringVar()
+        self.secret = ctk.StringVar()
+        self.tsgId = ctk.StringVar()
+        self.status = ctk.StringVar()
 
         ### Logo ###
         logo = ctk.CTkImage(
@@ -35,9 +36,7 @@ class AccountNCredentials(ctk.CTkFrame):
             master=self.root,
             image=logo,
             text=None,
-        ).pack(
-            anchor="center", fill="x", expand=True
-        )  # [x]: Change this to CTKImage somehow
+        ).pack(anchor="center", fill="x", expand=True)
 
         ### Credentials Input ###
         credentialsFrame = ctk.CTkFrame(master=self, fg_color="transparent")
@@ -55,19 +54,22 @@ class AccountNCredentials(ctk.CTkFrame):
             padx=5, pady=5, column=0, row=3, sticky="w"
         )
         self.nameField = ctk.CTkEntry(
-            master=credentialsFrame, justify="left", textvariable=username, width=400
+            master=credentialsFrame,
+            justify="left",
+            textvariable=self.username,
+            width=400,
         )
         self.nameField.grid(padx=5, pady=5, row=1, column=1, sticky="e", columnspan=3)
         self.secretField = ctk.CTkEntry(
             master=credentialsFrame,
             justify="left",
-            textvariable=secret,
+            textvariable=self.secret,
             width=400,
             show="*",
         )
         self.secretField.grid(padx=5, pady=5, row=2, column=1, sticky="e", columnspan=3)
         self.tsgIdField = ctk.CTkEntry(
-            master=credentialsFrame, justify="left", textvariable=tsgId, width=400
+            master=credentialsFrame, justify="left", textvariable=self.tsgId, width=400
         )
         self.tsgIdField.grid(padx=5, pady=5, row=3, column=1, sticky="e", columnspan=3)
         ctk.CTkButton(
@@ -75,11 +77,14 @@ class AccountNCredentials(ctk.CTkFrame):
             text="Clear",
             fg_color="gray25",
             hover_color="grey22",
+            command=self.clear_entry,
         ).grid(pady=5, column=2, row=4, sticky="e")
         ctk.CTkButton(master=credentialsFrame, text="Log In", command=self.login).grid(
             pady=5, column=3, row=4, sticky="e"
         )
-        self.workingLabel = ctk.CTkLabel(master=credentialsFrame, text=None)
+        self.workingLabel = ctk.CTkLabel(
+            master=credentialsFrame, textvariable=self.status
+        )
         self.workingLabel.grid(
             padx=5, pady=5, column=0, row=5, sticky="w", columnspan=4
         )
@@ -99,33 +104,33 @@ class AccountNCredentials(ctk.CTkFrame):
             self.tsgIdField.delete(first_index=0, last_index=ctk.END)
             self.tsgIdField.insert(index=0, string=self.controller.env["tsgId"])
 
+    def clear_entry(self) -> None:
+        self.username.set("")
+        self.secret.set("")
+        self.tsgId.set("")
+        self.status.set("")
+        self.workingLabel.configure(require_redraw=True)
+
     def login(self) -> None:
-        # BUG: Failed Login is still broken
-        if (
-            self.nameField.get() or self.secretField.get() or self.tsgIdField.get()
-        ) is None or "":
-            self.workingLabel.configure(
-                require_redraw=True,
-                text="Please fill credentials",
-                text_color="lightgreen",
-            )
-        self.workingLabel.configure(require_redraw=True, text="Logging In...")
+        if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
+            self.status.set("Please Fill All Credentials")
+            return None
+        self.status.set("Logging In...")
         try:
             auth = Login(
-                username=self.nameField.get(),
-                secret=self.secretField.get(),
-                tsg_id=self.tsgIdField.get(),
+                username=self.username.get(),
+                secret=self.secret.get(),
+                tsg_id=self.tsgId.get(),
             )
-            self.workingLabel.configure(
-                require_redraw=True, text="Login Success", text_color="lightgreen"
-            )
-        except Exception as error:
-            messagebox.showerror(title="Something Went Wrong!", message=error)
-        self.controller.authRes = auth.request()
-        try:
+            self.status.set("Getting Profile...")
+            self.controller.authRes = auth.request()
             profile = Profile(
                 bearer_token=self.controller.authRes["data"]["access_token"]
             )
+            self.controller.resProfile = profile.request()
+            self.status.set("Login Success")
+            self.master.activate_menu()
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
-        self.controller.resProfile = profile.request()
+            self.status.set("Logging In Failed")
+            return None
