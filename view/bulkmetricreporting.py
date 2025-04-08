@@ -1,25 +1,26 @@
 import os
 import queue
 import threading
-from time import time
+import asyncio
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
 import helper.logwriter as lw
 
-from requests.exceptions import HTTPError
+from time import time
 from numpy import array_split
 from tkinter import messagebox
 from functools import partial
 from tkcalendar import DateEntry
 from datetime import datetime as dt
+from requests.exceptions import HTTPError
 from dateutil.relativedelta import relativedelta as rdt
 
 from helper.api.getlist import ElementOfTenant
-from helper.api.monitor import SysMetric
 from helper.filehandler import FileHandler
 from helper.processing import average_per_site
+from helper.api.plainfunc import get_all_interfaces, system_metric
 
 
 class BulkMetricReporting(ctk.CTkFrame):
@@ -262,7 +263,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     def automate(self) -> None:
         self.automateReport.configure(state=ctk.DISABLED)
-        threadCount: int = 4
+        threadCount: int = 4 if len(self.siteList.index) > 4 else len(self.siteList)
         data: list = array_split(
             ary=self.siteList,
             indices_or_sections=threadCount,
@@ -270,7 +271,9 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.queuedRes = queue.Queue()
         workingThreads = []
         for _ in range(threadCount):
-            worker = threading.Thread(target=self.iterate_site, args=(data[_],))
+            worker = threading.Thread(
+                target=asyncio.run, args=(self.iterate_site(data[_]),)
+            )
             worker.start()
             workingThreads.append(worker)
         self.controller.after(
@@ -308,7 +311,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                 lw.save_log_to_file(self.logTerminal)
             self.automateReport.configure(state=ctk.ACTIVE)
 
-    def iterate_site(self, siteList: pd.DataFrame) -> None:
+    async def iterate_site(self, siteList: pd.DataFrame) -> None:
         def send_to_queue(tempRes: pd.Series, isError: bool = False) -> pd.Series:
             if not isError:
                 return tempRes
@@ -325,7 +328,7 @@ class BulkMetricReporting(ctk.CTkFrame):
                 widget=self.logTerminal, log=f"Working for  : {index} - {row['name']}"
             )
             try:
-                rawData = self.generate_data(tenant=row)
+                rawData = await self.generate_data(tenant=row)
                 tempRes = average_per_site(tenant=row, rawData=rawData)
                 if self.generatePlots.get():
                     self.render_canvas(site=row["name"], rawData=rawData)
@@ -350,30 +353,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             finally:
                 self.queuedRes.put(send_to_queue(tempRes, isError))
 
-    def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
-        def call_api(retry: int) -> dict:
-            try:
-                metric = SysMetric(
-                    bearer_token=self.controller.authRes["data"]["access_token"],
-                    body=payload,
-                )
-                return metric.request()
-            except HTTPError as reqError:
-                if retry == 0:
-                    raise reqError
-                lw.text_view_render(
-                    widget=self.logTerminal,
-                    log=f"HTTP Error occurred for {tenant['name']}. Retrying... ({retry} attempts left)",
-                )
-                return call_api(retry - 1)
-            except Exception as error:
-                if retry == 0:
-                    raise error
-                lw.text_view_render(
-                    widget=self.logTerminal,
-                    log=f"An error occurred for {tenant['name']}: {str(error)}. Retrying... ({retry} attempts left)",
-                )
-                return call_api(retry - 1)
+    async def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
 
         payload = {
             "start_time": dt.strptime(
@@ -391,7 +371,18 @@ class BulkMetricReporting(ctk.CTkFrame):
             "filter": {"site": [tenant["site_id"]], "element": [tenant["id"]]},
         }
 
-        return call_api(retries)
+        res = system_metric(
+            bearer_token=self.controller.authRes["data"]["access_token"],
+            body=payload,
+        )
+
+        res["data"]["interfaces"] = get_all_interfaces(
+            bearer_token=self.controller.authRes["data"]["access_token"],
+            site_id=tenant["site_id"],
+            element_id=tenant["id"],
+        )["data"]["items"]
+
+        return res
 
     def render_canvas(self, site: str, rawData: dict) -> dict:
         os.makedirs(name=f"{self.destDirectory}/{site}", exist_ok=True)
