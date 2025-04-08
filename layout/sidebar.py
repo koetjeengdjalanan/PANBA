@@ -12,4 +12,4 @@ class SideBar(ctk.CTkFrame):
         self.place(relx=self.start_pos, rely=0, relwidth=self.width, relheight=1)
 
         ### window Menu List ###
-        ctk.CTkLabel(master=self, text="PANBA (V 1.1.0)").pack(fill="x", pady=(2, 15))
+        ctk.CTkLabel(master=self, text="PANBA (V 1.2.5)").pack(fill="x", pady=(2, 15))
