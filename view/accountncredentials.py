@@ -1,4 +1,3 @@
-from time import sleep
 import customtkinter as ctk
 from tkinter import messagebox
 from PIL import Image
