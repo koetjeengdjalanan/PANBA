@@ -1,6 +1,8 @@
+from time import sleep
 import customtkinter as ctk
 from tkinter import messagebox
 from PIL import Image
+from threading import Thread
 
 from helper.api.auth import Login, Profile
 from assets.getfile import GetFile
@@ -72,16 +74,18 @@ class AccountNCredentials(ctk.CTkFrame):
             master=credentialsFrame, justify="left", textvariable=self.tsgId, width=400
         )
         self.tsgIdField.grid(padx=5, pady=5, row=3, column=1, sticky="e", columnspan=3)
-        ctk.CTkButton(
+        self.clearButton = ctk.CTkButton(
             master=credentialsFrame,
             text="Clear",
             fg_color="gray25",
             hover_color="grey22",
             command=self.clear_entry,
-        ).grid(pady=5, column=2, row=4, sticky="e")
-        ctk.CTkButton(master=credentialsFrame, text="Log In", command=self.login).grid(
-            pady=5, column=3, row=4, sticky="e"
         )
+        self.clearButton.grid(pady=5, column=2, row=4, sticky="e")
+        self.logInButton = ctk.CTkButton(
+            master=credentialsFrame, text="Log In", command=self.login
+        )
+        self.logInButton.grid(pady=5, column=3, row=4, sticky="e")
         self.workingLabel = ctk.CTkLabel(
             master=credentialsFrame, textvariable=self.status
         )
@@ -111,6 +115,13 @@ class AccountNCredentials(ctk.CTkFrame):
         self.status.set("")
         self.workingLabel.configure(require_redraw=True)
 
+    def lock_creds(self) -> None:
+        self.nameField.configure(state=ctk.DISABLED)
+        self.secretField.configure(state=ctk.DISABLED)
+        self.tsgIdField.configure(state=ctk.DISABLED)
+        self.clearButton.configure(state=ctk.DISABLED)
+        self.logInButton.configure(state=ctk.DISABLED)
+
     def login(self) -> None:
         if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
             self.status.set("Please Fill All Credentials")
@@ -130,7 +141,38 @@ class AccountNCredentials(ctk.CTkFrame):
             self.controller.resProfile = profile.request()
             self.status.set("Login Success")
             self.master.activate_menu()
+            self.lock_creds()
+            Thread(
+                target=self.after,
+                args=(
+                    (self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1)
+                    * 1000,
+                    self.refresh_token,
+                ),
+                daemon=True,
+            ).start()
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
             self.status.set("Logging In Failed")
+
+    def refresh_token(self) -> None:
+        expires_in = (
+            self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1
+        ) * 1000
+        if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
             return None
+        try:
+            auth = Login(
+                username=self.username.get(),
+                secret=self.secret.get(),
+                tsg_id=self.tsgId.get(),
+            )
+            self.controller.authRes = auth.request()
+            profile = Profile(
+                bearer_token=self.controller.authRes["data"]["access_token"]
+            )
+            self.controller.resProfile = profile.request()
+        except Exception as error:
+            messagebox.showerror(title="Something Went Wrong!", message=error)
+            return None
+        self.after(expires_in, self.refresh_token)
