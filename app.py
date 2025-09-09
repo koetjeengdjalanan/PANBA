@@ -2,6 +2,7 @@ import os
 import customtkinter as ctk
 from pathlib import Path
 from dotenv import load_dotenv
+from helper.config import load_config
 
 from layout.sidebar import SideBar
 from view.accountncredentials import AccountNCredentials
@@ -19,14 +20,18 @@ class App(ctk.CTk):
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
         self.resizable(False, False)
-        self.env = env if not None else None
+
+        # Preserve existing env behavior (from .env) and load persisted config
+        # for defaults and user preferences.
+        self.env = env if env is not None else None
+        self.config = load_config()
         self.frames = {}
         self.authRes = None
 
-        ### Side Bar ###
+        # Side Bar
         # FIXME: Other menu still accessible even in not a dev environment
         self.sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
-        self.menuList: list[list] = [
+        self.menuList = [
             ["Account & Credentials", AccountNCredentials, True],
             ["Site Configuration", SiteConfiguration, False],
             ["Device's Metric", DeviceMetric, False],

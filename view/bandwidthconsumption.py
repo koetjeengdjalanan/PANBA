@@ -1,10 +1,12 @@
 import traceback
+from pathlib import Path
 import customtkinter as ctk
 import pandas as pd
 from helper.api.getlist import RemoteNetworkBandwidth
 from helper.filehandler import FileHandler
 import helper.logwriter as lw
 from helper.settings.apisettings import BWConsSetting
+from helper.config import save_config
 
 
 class BandwidthConsumption(ctk.CTkFrame):
@@ -12,7 +14,19 @@ class BandwidthConsumption(ctk.CTkFrame):
         super().__init__(master=master, fg_color="transparent", corner_radius=None)
         self.controller = controller
         self.FH = FileHandler()
-        self.outputPath: ctk.StringVar = ctk.StringVar(value=self.FH.savedFile)
+        # Prefill output path from config if available
+        try:
+            paths_cfg = (
+                self.controller.config.get("paths")
+                if isinstance(self.controller.config.get("paths"), dict)
+                else None
+            )
+            if paths_cfg and paths_cfg.get("last_export_dir"):
+                self.FH.destDir = Path(paths_cfg.get("last_export_dir"))
+                self.FH.initDir = Path(paths_cfg.get("last_export_dir"))
+        except Exception:
+            pass
+        self.outputPath: ctk.StringVar = ctk.StringVar(value=str(self.FH.savedFile))
         self.daysAgo: ctk.IntVar = ctk.IntVar(value=90)
         self.leftSetupFrame, self.rightSetupFrame = self.__setup_frame()
         self.__output_config()
@@ -41,7 +55,18 @@ class BandwidthConsumption(ctk.CTkFrame):
 
     def __output_config(self):
         def set_output_path():
-            val = self.FH.save_file_loc().savedFile
+            # Use last_export_dir if present
+            dir_hint = None
+            try:
+                paths_cfg = (
+                    self.controller.config.get("paths")
+                    if isinstance(self.controller.config.get("paths"), dict)
+                    else None
+                )
+                dir_hint = paths_cfg.get("last_export_dir") if paths_cfg else None
+            except Exception:
+                dir_hint = None
+            val = self.FH.save_file_loc(dirStr=dir_hint or self.FH.destDir).savedFile
             self.outputPath.set(value=str(val))
             lw.text_view_render(widget=self.logBox, log=f"File path set to {val}")
             outputEntry.xview_moveto(1)
@@ -150,6 +175,14 @@ class BandwidthConsumption(ctk.CTkFrame):
                 widget=self.logBox,
                 log=f"SUCCESS! Data Exported to {self.FH.savedFile}",
             )
+            # Persist last export directory
+            try:
+                self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
+                    Path(self.FH.savedFile).parent
+                )
+                save_config(self.controller.config)
+            except Exception:
+                pass
         except Exception as e:
             lw.text_view_render(
                 widget=self.logBox, log=f"ERROR! {e}\n{traceback.format_exc()}"

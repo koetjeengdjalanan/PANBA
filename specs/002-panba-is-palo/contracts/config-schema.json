@@ -1,0 +1,97 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://nttindo.local/panba/config.schema.json",
+    "title": "PANBA User Configuration",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "ui": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "remember_me": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "defaults": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "duration_days": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 90,
+                            "default": 90
+                        },
+                        "generate_plots": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "debug_mode": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    "required": [
+                        "duration_days",
+                        "generate_plots",
+                        "debug_mode"
+                    ]
+                }
+            },
+            "required": [
+                "remember_me",
+                "defaults"
+            ]
+        },
+        "paths": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "last_open_dir": {
+                    "type": "string"
+                },
+                "last_export_dir": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "last_open_dir",
+                "last_export_dir"
+            ]
+        },
+        "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "username": {
+                    "type": "string"
+                },
+                "tsg_id": {
+                    "type": [
+                        "string",
+                        "integer"
+                    ]
+                },
+                "secret_enc": {
+                    "type": "string",
+                    "description": "base64 of DPAPI-encrypted secret"
+                }
+            },
+            "required": [
+                "username",
+                "tsg_id"
+            ]
+        }
+    },
+    "required": [
+        "version",
+        "ui",
+        "paths",
+        "auth"
+    ]
+}
