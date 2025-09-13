@@ -18,7 +18,7 @@ def get_all_interfaces(
         headers={
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "NTTIndonesia-PANBA/1.2.5",
+            "User-Agent": "NTTIndonesia-PANBA/1.2.7",
             "Authorization": f"Bearer {bearer_token}",
         },
     )
@@ -43,7 +43,7 @@ def system_metric(
             "X-PANW-Region": "sg",
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "NTTIndonesia-PANBA/1.2.5",
+            "User-Agent": "NTTIndonesia-PANBA/1.2.7",
             "Authorization": f"Bearer {bearer_token}",
         },
     )
