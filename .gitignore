@@ -1,6 +1,7 @@
 .vscode/
 *.bak
-.debug/
+**debug/**
+debug.py
 .devAsset/
 
 # Created by https://www.toptal.com/developers/gitignore/api/python

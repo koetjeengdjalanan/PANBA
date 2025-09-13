@@ -20,7 +20,7 @@ from dateutil.relativedelta import relativedelta as rdt
 
 from helper.api.getlist import ElementOfTenant
 from helper.filehandler import FileHandler
-from helper.processing import average_per_site
+from helper.processing import average_per_site, filter_interfaces
 from helper.api.plainfunc import get_all_interfaces, system_metric
 from helper.config import save_config
 
@@ -407,8 +407,16 @@ class BulkMetricReporting(ctk.CTkFrame):
                 self.queuedRes.put(send_to_queue(tempRes, isError))
 
     async def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
+        interfaces = get_all_interfaces(
+            bearer_token=self.controller.authRes["data"]["access_token"],
+            site_id=tenant["site_id"],
+            element_id=tenant["id"],
+        )
+        filtered_interfaces: list[str] = filter_interfaces(
+            interfaces=interfaces["data"]["items"], site_name=tenant["name"]
+        )
 
-        payload = {
+        allSum_payload = {
             "start_time": dt.strptime(
                 f"{self.dateAgo.get()} 00 00",
                 "%m/%d/%Y %H %M",
@@ -426,14 +434,28 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         res = system_metric(
             bearer_token=self.controller.authRes["data"]["access_token"],
-            body=payload,
+            body=allSum_payload,
         )
 
-        res["data"]["interfaces"] = get_all_interfaces(
-            bearer_token=self.controller.authRes["data"]["access_token"],
-            site_id=tenant["site_id"],
-            element_id=tenant["id"],
-        )["data"]["items"]
+        if len(filtered_interfaces) > 0:
+            interfaces_payload = allSum_payload.copy()
+            interfaces_payload["metrics"] = self.metrics[-1:]
+            interfaces_payload["filter"]["interface"] = filtered_interfaces
+            interfaces_payload["view"] = {"individual": "interface", "summary": True}
+            interfaceRes = system_metric(
+                bearer_token=self.controller.authRes["data"]["access_token"],
+                body=interfaces_payload,
+            )
+            filtered_res: dict[str, str | dict] = next(
+                s
+                for metric in interfaceRes.get("data", {}).get("metrics", [])
+                for s in metric.get("series", [])
+                if s.get("view") == "summary"
+            )
+            filtered_res["name"] = "filteredInterfaceBandwidthUsage"
+            res["data"]["metrics"].append({"series": [filtered_res]})
+
+        res["data"]["interfaces"] = interfaces["data"]["items"]
 
         return res
 
