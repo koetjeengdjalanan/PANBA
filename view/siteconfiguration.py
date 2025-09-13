@@ -96,9 +96,12 @@ class SiteConfiguration(ctk.CTkFrame):
         updates the UI entry, and saves last_import_dir/file in config.
         """
 
-        self.FH.select_file()
-        if not self.FH.sourceFile or not self.FH.sourceFile.exists():
+        selected_file = self.FH.select_file()
+        # If select_file returns the selected file, use it; otherwise, check sourceFile
+        if selected_file is None or not Path(selected_file).exists():
+            self.FH.sourceFile = None
             return
+        self.FH.sourceFile = Path(selected_file)
         # Persist last import dir and file
         try:
             self.controller.config.setdefault("paths", {})["last_import_dir"] = str(
