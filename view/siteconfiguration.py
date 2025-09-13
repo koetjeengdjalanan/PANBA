@@ -1,4 +1,5 @@
 import threading
+from pathlib import Path
 import customtkinter as ctk
 import pandas as pd
 
@@ -6,6 +7,7 @@ from tkinter import messagebox
 from tksheet import Sheet
 from helper.api.getlist import SiteOfTenant
 from helper.filehandler import FileHandler
+from helper.config import save_config
 
 
 class SiteConfiguration(ctk.CTkFrame):
@@ -14,6 +16,17 @@ class SiteConfiguration(ctk.CTkFrame):
         self.dataPreview = None
         self.controller = controller
         self.FH = FileHandler()
+        # Prefill initial directory from config if available
+        try:
+            paths_cfg = (
+                self.controller.config.get("paths")
+                if isinstance(self.controller.config.get("paths"), dict)
+                else None
+            )
+            if paths_cfg and paths_cfg.get("last_import_dir"):
+                self.FH.initDir = Path(paths_cfg.get("last_import_dir"))
+        except Exception:
+            pass
 
         ### Source File ###
         self.filePickerFrame = ctk.CTkFrame(self)
@@ -37,6 +50,18 @@ class SiteConfiguration(ctk.CTkFrame):
             placeholder_text="Source File Directory ...",
         )
         self.filePickerEntry.pack(pady=10, padx=10, side="left", fill="x", expand=True)
+        # Prefill last selected file path if available
+        try:
+            paths_cfg = (
+                self.controller.config.get("paths")
+                if isinstance(self.controller.config.get("paths"), dict)
+                else None
+            )
+            if paths_cfg and paths_cfg.get("last_import_file"):
+                self.filePickerEntry.delete(0, ctk.END)
+                self.filePickerEntry.insert(0, paths_cfg.get("last_import_file"))
+        except Exception:
+            pass
         ctk.CTkButton(
             master=dataPickerTab.tab("From File"),
             text="Choose File",
@@ -64,13 +89,43 @@ class SiteConfiguration(ctk.CTkFrame):
         ).pack(side="left")
 
     def pick_source_file(self):
-        file = self.FH.select_file()
-        self.dataPreview = self.FH.sourcedata
-        # print(self.dataPreview.columns.values.tolist())
-        self.__show_data()
-        if file != "":
-            self.filePickerEntry.delete(0, ctk.END)
-            self.filePickerEntry.insert(0, file)
+        """Open a file picker, load preview data, and persist last path.
+
+        Uses FileHandler to open a file dialog starting from the last used
+        directory when available, reads the selected file into a DataFrame,
+        updates the UI entry, and saves last_import_dir/file in config.
+        """
+
+        selected_file = self.FH.select_file()
+        # If select_file returns the selected file, use it; otherwise, check sourceFile
+        if selected_file is None or not Path(selected_file).exists():
+            self.FH.sourceFile = None
+            return
+        self.FH.sourceFile = Path(selected_file)
+        # Persist last import dir and file
+        try:
+            self.controller.config.setdefault("paths", {})["last_import_dir"] = str(
+                self.FH.sourceFile.parent
+            )
+            self.controller.config.setdefault("paths", {})["last_import_file"] = str(
+                self.FH.sourceFile
+            )
+            save_config(self.controller.config)
+        except Exception:
+            pass
+        # Update entry text
+        self.filePickerEntry.delete(0, ctk.END)
+        self.filePickerEntry.insert(0, str(self.FH.sourceFile))
+        # Load and preview data
+        try:
+            self.FH.read_file()
+            self.dataPreview = self.FH.sourceData
+            self.__show_data()
+        except Exception as e:
+            messagebox.showerror(
+                title="Something Went Wrong!",
+                message=f"Failed to read file: {e}",
+            )
 
     def download_list(self) -> None:
         download = SiteOfTenant(
@@ -99,8 +154,29 @@ class SiteConfiguration(ctk.CTkFrame):
         table.pack(anchor="center", expand=True, fill="both")
 
     def save_to_file(self) -> None:
-        if self.dataPreview is not None or "":
-            self.FH.save_as_excel(data=self.dataPreview)
+        if self.dataPreview is not None and not self.dataPreview.empty:
+            # Start in last export dir if available
+            dir_hint = None
+            try:
+                paths_cfg = (
+                    self.controller.config.get("paths")
+                    if isinstance(self.controller.config.get("paths"), dict)
+                    else None
+                )
+                dir_hint = paths_cfg.get("last_export_dir") if paths_cfg else None
+            except Exception:
+                dir_hint = None
+            self.FH.save_file_loc(dirStr=dir_hint or self.FH.destDir).export_excel(
+                data=self.dataPreview
+            )
+            # Persist last export directory
+            try:
+                self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
+                    self.FH.savedFile.parent
+                )
+                save_config(self.controller.config)
+            except Exception:
+                pass
         else:
             messagebox.showerror(
                 title="Something Went Wrong!", message="No Data Selected!"

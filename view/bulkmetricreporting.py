@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import queue
 import threading
 import asyncio
@@ -19,8 +20,9 @@ from dateutil.relativedelta import relativedelta as rdt
 
 from helper.api.getlist import ElementOfTenant
 from helper.filehandler import FileHandler
-from helper.processing import average_per_site
+from helper.processing import average_per_site, filter_interfaces
 from helper.api.plainfunc import get_all_interfaces, system_metric
+from helper.config import save_config
 
 
 class BulkMetricReporting(ctk.CTkFrame):
@@ -28,6 +30,8 @@ class BulkMetricReporting(ctk.CTkFrame):
         super().__init__(master=master, fg_color="transparent", corner_radius=None)
         self.controller = controller
         self.FH = FileHandler()
+        # Default destination directory string used for exports; set early
+        self.destDirectory = str(self.FH.destDir) if hasattr(self.FH, "destDir") else ""
         self.queuedRes = queue.Queue()
         self.siteList = None
         self.now = dt.now()
@@ -64,6 +68,29 @@ class BulkMetricReporting(ctk.CTkFrame):
             command=self.pick_dest_dir,
             # command=lambda: threading.Thread(target=self.pick_source_file).start(),
         ).pack(padx=10, pady=10, side="right", fill="none", expand=False)
+
+        # Prefill output directory from config if available
+        try:
+            paths_cfg = (
+                self.controller.config.get("paths")
+                if isinstance(self.controller.config.get("paths"), dict)
+                else None
+            )
+            if paths_cfg and paths_cfg.get("last_export_dir"):
+                self.destDirectory = paths_cfg.get("last_export_dir")
+                # Sync FileHandler defaults for subsequent dialogs
+                try:
+                    self.FH.destDir = Path(self.destDirectory)
+                    self.FH.initDir = Path(self.destDirectory)
+                except Exception:
+                    pass
+                # Update entry text
+                self.outputDirEntry.configure(state=ctk.NORMAL)
+                self.outputDirEntry.delete(0, ctk.END)
+                self.outputDirEntry.insert(0, self.destDirectory)
+                self.outputDirEntry.configure(state=ctk.DISABLED)
+        except Exception:
+            pass
 
         ### Setting Frame ###
         settingFrame = ctk.CTkFrame(master=self)
@@ -150,13 +177,31 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.logTerminal.pack(fill=ctk.BOTH, expand=True, pady=5, padx=5)
 
     def pick_dest_dir(self) -> None:
-        self.destDirectory = self.FH.select_directory().initDir
+        # Default to last_export_dir from config when available
+        try:
+            last_dir = (
+                self.controller.config.get("paths", {}).get("last_export_dir")
+                if isinstance(self.controller.config.get("paths"), dict)
+                else None
+            )
+            start_dir = last_dir if last_dir else self.FH.initDir
+            self.destDirectory = self.FH.select_directory(dirStr=start_dir).initDir
+        except Exception:
+            self.destDirectory = self.FH.select_directory().initDir
         self.outputDirEntry.configure(state=ctk.NORMAL)
         if self.destDirectory != "":
             self.FH.destDir = self.destDirectory
             self.outputDirEntry.delete(0, ctk.END)
             self.outputDirEntry.insert(0, self.destDirectory)
         self.outputDirEntry.configure(state=ctk.DISABLED)
+        # Persist last_export_dir for future defaults
+        try:
+            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
+                self.destDirectory
+            )
+            save_config(self.controller.config)
+        except Exception:
+            pass
 
     def date_picker(self, parent) -> None:
         ctk.CTkLabel(master=parent, text="Choose Date:").grid(
@@ -258,6 +303,14 @@ class BulkMetricReporting(ctk.CTkFrame):
         lw.text_view_render(
             widget=self.logTerminal, log="file saved: " + str(self.FH.savedFile)
         )
+        # Remember export dir after save
+        try:
+            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
+                self.destDirectory
+            )
+            save_config(self.controller.config)
+        except Exception:
+            pass
         if self.debugState.get():
             lw.save_log_to_file(self.logTerminal)
 
@@ -354,8 +407,16 @@ class BulkMetricReporting(ctk.CTkFrame):
                 self.queuedRes.put(send_to_queue(tempRes, isError))
 
     async def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
+        interfaces = get_all_interfaces(
+            bearer_token=self.controller.authRes["data"]["access_token"],
+            site_id=tenant["site_id"],
+            element_id=tenant["id"],
+        )
+        filtered_interfaces: list[str] = filter_interfaces(
+            interfaces=interfaces["data"]["items"], site_name=tenant["name"]
+        )
 
-        payload = {
+        allSum_payload = {
             "start_time": dt.strptime(
                 f"{self.dateAgo.get()} 00 00",
                 "%m/%d/%Y %H %M",
@@ -373,14 +434,28 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         res = system_metric(
             bearer_token=self.controller.authRes["data"]["access_token"],
-            body=payload,
+            body=allSum_payload,
         )
 
-        res["data"]["interfaces"] = get_all_interfaces(
-            bearer_token=self.controller.authRes["data"]["access_token"],
-            site_id=tenant["site_id"],
-            element_id=tenant["id"],
-        )["data"]["items"]
+        if len(filtered_interfaces) > 0:
+            interfaces_payload = allSum_payload.copy()
+            interfaces_payload["metrics"] = self.metrics[-1:]
+            interfaces_payload["filter"]["interface"] = filtered_interfaces
+            interfaces_payload["view"] = {"individual": "interface", "summary": True}
+            interfaceRes = system_metric(
+                bearer_token=self.controller.authRes["data"]["access_token"],
+                body=interfaces_payload,
+            )
+            filtered_res: dict[str, str | dict] = next(
+                s
+                for metric in interfaceRes.get("data", {}).get("metrics", [])
+                for s in metric.get("series", [])
+                if s.get("view") == "summary"
+            )
+            filtered_res["name"] = "filteredInterfaceBandwidthUsage"
+            res["data"]["metrics"].append({"series": [filtered_res]})
+
+        res["data"]["interfaces"] = interfaces["data"]["items"]
 
         return res
 

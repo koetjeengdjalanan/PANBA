@@ -262,18 +262,51 @@ class FileHandler:
         """
         data = data if data is not None else self.sourceData
         writer = pd.ExcelWriter(path=self.savedFile, engine="xlsxwriter")
+
+        def _manual_autofit(ws, df: pd.DataFrame):
+            for col_idx, col_name in enumerate(df.columns):
+                series = df[col_name]
+                max_len = len(str(col_name))
+                if not series.empty:
+                    cell_max = series.astype(str).map(len).max()
+                    if cell_max > max_len:
+                        max_len = cell_max
+                ws.set_column(col_idx, col_idx, min(max_len + 2, 100))
+
+        def _apply_autofit(sheet_name: str, df: pd.DataFrame):
+            ws = writer.sheets.get(sheet_name)
+            if ws is None:
+                return
+            try:
+                autofit_method = getattr(ws, "autofit", None)
+                if callable(autofit_method):
+                    autofit_method()
+                else:
+                    _manual_autofit(ws, df)
+            except Exception:
+                _manual_autofit(ws, df)
+
         match data:
             case pd.DataFrame():
-                data.to_excel(excel_writer=writer, sheet_name="Sheet1")
-                writer.close()
+                data.to_excel(
+                    excel_writer=writer,
+                    sheet_name="Sheet1",
+                    index=False,
+                    freeze_panes=(1, 0),
+                )
+                _apply_autofit("Sheet1", data)
             case dict():
                 for key in data.keys():
                     pd.DataFrame(data=data[key]).to_excel(
-                        excel_writer=writer, sheet_name=key
+                        excel_writer=writer,
+                        sheet_name=key,
+                        index=False,
+                        freeze_panes=(1, 0),
                     )
-                writer.close()
+                    _apply_autofit(key, pd.DataFrame(data=data[key]))
             case _:
                 raise ValueError("Invalid Data Type", type(data))
+        writer.close()
         return self
 
     def flatten_dict(

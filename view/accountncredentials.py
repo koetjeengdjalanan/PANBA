@@ -5,6 +5,7 @@ from threading import Thread
 
 from helper.api.auth import Login, Profile
 from assets.getfile import GetFile
+from helper.config import decrypt_secret, encrypt_secret, save_config
 
 
 class AccountNCredentials(ctk.CTkFrame):
@@ -20,10 +21,14 @@ class AccountNCredentials(ctk.CTkFrame):
         self.getFile = GetFile
         # print(self.controller.env)
 
-        self.username = ctk.StringVar()
-        self.secret = ctk.StringVar()
-        self.tsgId = ctk.StringVar()
-        self.status = ctk.StringVar()
+        # Typed tkinter variables
+        self.username: ctk.StringVar = ctk.StringVar()
+        self.secret: ctk.StringVar = ctk.StringVar()
+        self.tsgId: ctk.StringVar = ctk.StringVar()
+        self.status: ctk.StringVar = ctk.StringVar()
+        self.rememberMe: ctk.BooleanVar = ctk.BooleanVar(
+            value=bool(controller.config.get("ui", {}).get("remember_me", True))
+        )
 
         ### Logo ###
         logo = ctk.CTkImage(
@@ -81,6 +86,9 @@ class AccountNCredentials(ctk.CTkFrame):
             command=self.clear_entry,
         )
         self.clearButton.grid(pady=5, column=2, row=4, sticky="e")
+        ctk.CTkCheckBox(
+            master=credentialsFrame, text="Remember me", variable=self.rememberMe
+        ).grid(pady=5, column=0, row=4, sticky="w")
         self.logInButton = ctk.CTkButton(
             master=credentialsFrame, text="Log In", command=self.login
         )
@@ -93,19 +101,51 @@ class AccountNCredentials(ctk.CTkFrame):
         )
 
         ### Populate Entry ###
-        if self.controller.env is not None or "":
-            self.after(ms=10, func=self.__populate_entry)
+        # Populate fields shortly after render
+        self.after(ms=10, func=self.__populate_entry)
 
     def __populate_entry(self) -> None:
-        if self.controller.env["userName"] is not None or "":
-            self.nameField.delete(first_index=0, last_index=ctk.END)
-            self.nameField.insert(index=0, string=self.controller.env["userName"])
-        if self.controller.env["secret"] is not None or "":
-            self.secretField.delete(first_index=0, last_index=ctk.END)
-            self.secretField.insert(index=0, string=self.controller.env["secret"])
-        if self.controller.env["tsgId"] is not None or "":
-            self.tsgIdField.delete(first_index=0, last_index=ctk.END)
-            self.tsgIdField.insert(index=0, string=self.controller.env["tsgId"])
+        """Prefill credential fields from .env (fast) then config (robust)."""
+        try:
+            env = self.controller.env or {}
+            # .env first (dev convenience)
+            if env.get("userName"):
+                self.nameField.delete(0, ctk.END)
+                self.nameField.insert(0, env.get("userName"))
+            if env.get("secret"):
+                self.secretField.delete(0, ctk.END)
+                self.secretField.insert(0, env.get("secret"))
+            if env.get("tsgId"):
+                self.tsgIdField.delete(0, ctk.END)
+                self.tsgIdField.insert(0, env.get("tsgId"))
+            # Config fallback (persisted between runs)
+            self._prefill_from_config()
+        except Exception:
+            # Silently ignore prefill errors to avoid blocking UI
+            pass
+
+    def _prefill_from_config(self) -> None:
+        """Fill fields from persisted config using DPAPI to decrypt secret."""
+        cfg = self.controller.config
+        auth = cfg.get("auth", {}) if isinstance(cfg.get("auth"), dict) else {}
+        username = auth.get("username")
+        tsg_id = auth.get("tsg_id")
+        secret_enc = auth.get("secret_enc", "")
+        if username:
+            self.nameField.delete(0, ctk.END)
+            self.nameField.insert(0, str(username))
+        if tsg_id:
+            self.tsgIdField.delete(0, ctk.END)
+            self.tsgIdField.insert(0, str(tsg_id))
+        if secret_enc:
+            try:
+                plain = decrypt_secret(secret_enc)
+                if plain:
+                    self.secretField.delete(0, ctk.END)
+                    self.secretField.insert(0, plain)
+            except Exception:
+                # Ignore decryption errors; user can retype
+                pass
 
     def clear_entry(self) -> None:
         self.username.set("")
@@ -141,6 +181,8 @@ class AccountNCredentials(ctk.CTkFrame):
             self.status.set("Login Success")
             self.master.activate_menu()
             self.lock_creds()
+            # Persist credentials and preference if enabled
+            self._persist_credentials()
             Thread(
                 target=self.after,
                 args=(
@@ -175,3 +217,26 @@ class AccountNCredentials(ctk.CTkFrame):
             messagebox.showerror(title="Something Went Wrong!", message=error)
             return None
         self.after(expires_in, self.refresh_token)
+
+    def _persist_credentials(self) -> None:
+        """Persist current credentials to config if 'Remember me' is enabled.
+
+        Uses DPAPI to encrypt the secret. Updates the app's in-memory config
+        first, then saves to disk. Errors are ignored to avoid blocking UI.
+        """
+        try:
+            # Update remember_me preference
+            self.controller.config.setdefault("ui", {})["remember_me"] = bool(
+                self.rememberMe.get()
+            )
+            if not self.rememberMe.get():
+                return
+            # Write auth fields
+            auth = self.controller.config.setdefault("auth", {})
+            auth["username"] = self.username.get()
+            auth["tsg_id"] = self.tsgId.get()
+            auth["secret_enc"] = encrypt_secret(self.secret.get())
+            save_config(self.controller.config)
+        except Exception:
+            # Do not fail login if persistence fails
+            pass

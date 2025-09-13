@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 from statistics import mean
 
@@ -28,3 +29,34 @@ def average_per_site(tenant: pd.Series, rawData: dict) -> pd.Series:
     )
 
     return res
+
+
+def filter_interfaces(
+    interfaces: list[dict], site_name: str, *args, **kwargs
+) -> list[str]:
+
+    filter = kwargs.get("filter", {})
+    if not isinstance(filter, list):
+        filter = [
+            ("^DC-|^DRC", "^13"),
+            ("^DCI-", "^13$|^14"),
+        ]
+    # Pre-compile all patterns in filter
+    compiled_filter = [
+        (re.compile(name_pattern), re.compile(interface_pattern))
+        for name_pattern, interface_pattern in filter
+    ]
+    for name_regex, interface_regex in compiled_filter:
+        if name_regex.search(site_name):
+            return [
+                interface.get("id")
+                for interface in interfaces
+                if interface_regex.search(interface.get("name", ""))
+            ]
+    # Pre-compile fallback pattern
+    fallback_regex = re.compile("^1$")
+    return [
+        interface.get("id")
+        for interface in interfaces
+        if fallback_regex.search(interface.get("name", ""))
+    ]

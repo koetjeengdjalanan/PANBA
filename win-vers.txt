@@ -17,12 +17,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'NTT Indonesia'),
             StringStruct(u'FileDescription', u'Retiteration from PaloAltoNetworkBulkAutomation'),
-            StringStruct(u'FileVersion', u'1.2.6'),
+            StringStruct(u'FileVersion', u'1.2.7'),
             StringStruct(u'InternalName', u'PANBA-NTT'),
             StringStruct(u'LegalCopyright', u'© 2024 NTT Indonesia. All rights reserved.'),
             StringStruct(u'OriginalFilename', u'PANBA.exe'),
             StringStruct(u'ProductName', u'PANBA-NTT'),
-            StringStruct(u'ProductVersion', u'1.2.6'),
+            StringStruct(u'ProductVersion', u'1.2.7'),
             StringStruct(u'Author', u'Martin Sambulare'),
             StringStruct(u'DeveloperContact', u'martin.sambulare@nttindonesia.com')
           ]
