@@ -41,15 +41,22 @@ def filter_interfaces(
             ("^DC-|^DRC", "^13"),
             ("^DCI-", "^13$|^14"),
         ]
-    for name_pattern, interface_pattern in filter:
-        if re.search(re.compile(name_pattern), site_name):
+    # Pre-compile all patterns in filter
+    compiled_filter = [
+        (re.compile(name_pattern), re.compile(interface_pattern))
+        for name_pattern, interface_pattern in filter
+    ]
+    for name_regex, interface_regex in compiled_filter:
+        if name_regex.search(site_name):
             return [
                 interface.get("id")
                 for interface in interfaces
-                if re.search(re.compile(interface_pattern), interface.get("name", ""))
+                if interface_regex.search(interface.get("name", ""))
             ]
+    # Pre-compile fallback pattern
+    fallback_regex = re.compile("^1$")
     return [
         interface.get("id")
         for interface in interfaces
-        if re.search(re.compile("^1$"), interface.get("name", ""))
+        if fallback_regex.search(interface.get("name", ""))
     ]
