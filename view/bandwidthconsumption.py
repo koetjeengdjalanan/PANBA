@@ -7,11 +7,16 @@ from helper.filehandler import FileHandler
 import helper.logwriter as lw
 from helper.settings.apisettings import BWConsSetting
 from helper.config import save_config
+from models import AppController
 
 
 class BandwidthConsumption(ctk.CTkFrame):
-    def __init__(self, master, controller):
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
+    def __init__(self, master: ctk.CTk, controller: AppController):
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
         self.controller = controller
         self.FH = FileHandler()
         # Prefill output path from config if available
@@ -163,7 +168,7 @@ class BandwidthConsumption(ctk.CTkFrame):
         lw.text_view_render(widget=self.logBox, log="Requesting Data")
         try:
             rm = RemoteNetworkBandwidth(
-                bearer_token=self.controller.authRes["data"]["access_token"], body=body
+                bearer_token=self.controller.auth.access_token, body=body
             )
             res = rm.request()["data"]["data"]
             data = pd.DataFrame(res)

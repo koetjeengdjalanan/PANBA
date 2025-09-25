@@ -6,11 +6,16 @@ from threading import Thread
 from helper.api.auth import Login, Profile
 from assets.getfile import GetFile
 from helper.config import decrypt_secret, encrypt_secret, save_config
+from models import AppController, AuthenticationProfile
 
 
 class AccountNCredentials(ctk.CTkFrame):
-    def __init__(self, master, controller):
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
+    def __init__(self, master: ctk.CTk, controller: AppController):
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
 
         ### Root Frame ###
         self.root = ctk.CTkFrame(
@@ -107,18 +112,12 @@ class AccountNCredentials(ctk.CTkFrame):
     def __populate_entry(self) -> None:
         """Prefill credential fields from .env (fast) then config (robust)."""
         try:
-            env = self.controller.env or {}
-            # .env first (dev convenience)
-            if env.get("userName"):
-                self.nameField.delete(0, ctk.END)
-                self.nameField.insert(0, env.get("userName"))
-            if env.get("secret"):
-                self.secretField.delete(0, ctk.END)
-                self.secretField.insert(0, env.get("secret"))
-            if env.get("tsgId"):
-                self.tsgIdField.delete(0, ctk.END)
-                self.tsgIdField.insert(0, env.get("tsgId"))
-            # Config fallback (persisted between runs)
+            self.nameField.delete(0, ctk.END)
+            self.nameField.insert(0, self.controller.env.userName)
+            self.tsgIdField.delete(0, ctk.END)
+            self.tsgIdField.insert(0, self.controller.env.tsgId)
+            self.secretField.delete(0, ctk.END)
+            self.secretField.insert(0, self.controller.env.secret)
             self._prefill_from_config()
         except Exception:
             # Silently ignore prefill errors to avoid blocking UI
@@ -173,11 +172,16 @@ class AccountNCredentials(ctk.CTkFrame):
                 tsg_id=self.tsgId.get(),
             )
             self.status.set("Getting Profile...")
-            self.controller.authRes = auth.request()
-            profile = Profile(
-                bearer_token=self.controller.authRes["data"]["access_token"]
+            login_res = auth.request()["data"]
+            profile = Profile(bearer_token=login_res["access_token"])
+            profile_res = profile.request()["data"]
+            self.controller.auth = AuthenticationProfile(
+                access_token=login_res["access_token"],
+                scope=login_res["scope"],
+                expire_in=login_res["expires_in"] * 995,
+                tenant_id=profile_res["tenant_id"],
+                session_id=profile_res["session_id"],
             )
-            self.controller.resProfile = profile.request()
             self.status.set("Login Success")
             self.master.activate_menu()
             self.lock_creds()
@@ -186,8 +190,8 @@ class AccountNCredentials(ctk.CTkFrame):
             Thread(
                 target=self.after,
                 args=(
-                    (self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1)
-                    * 1000,
+                    # (self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1)
+                    self.controller.auth.expire_in,
                     self.refresh_token,
                 ),
                 daemon=True,
@@ -197,9 +201,6 @@ class AccountNCredentials(ctk.CTkFrame):
             self.status.set("Logging In Failed")
 
     def refresh_token(self) -> None:
-        expires_in = (
-            self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1
-        ) * 1000
         if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
             return None
         try:
@@ -209,14 +210,12 @@ class AccountNCredentials(ctk.CTkFrame):
                 tsg_id=self.tsgId.get(),
             )
             self.controller.authRes = auth.request()
-            profile = Profile(
-                bearer_token=self.controller.authRes["data"]["access_token"]
-            )
+            profile = Profile(bearer_token=self.controller.auth.access_token)
             self.controller.resProfile = profile.request()
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
             return None
-        self.after(expires_in, self.refresh_token)
+        self.after(self.controller.auth.expire_in, self.refresh_token)
 
     def _persist_credentials(self) -> None:
         """Persist current credentials to config if 'Remember me' is enabled.

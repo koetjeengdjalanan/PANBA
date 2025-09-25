@@ -23,12 +23,18 @@ from helper.filehandler import FileHandler
 from helper.processing import average_per_site, filter_interfaces
 from helper.api.plainfunc import get_all_interfaces, system_metric
 from helper.config import save_config
+from models import AppController
 
 
 class BulkMetricReporting(ctk.CTkFrame):
-    def __init__(self, master, controller) -> None:
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
+    def __init__(self, master: ctk.CTk, controller: AppController) -> None:
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
         self.controller = controller
+        self.master = master
         self.FH = FileHandler()
         # Default destination directory string used for exports; set early
         self.destDirectory = str(self.FH.destDir) if hasattr(self.FH, "destDir") else ""
@@ -248,12 +254,10 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
 
     def get_site_list(self) -> None:
-        if self.controller.authRes is None:
+        if self.controller.auth is None:
             messagebox.showerror(title="No Login Found!", message="Please login first!")
             return None
-        element = ElementOfTenant(
-            bearer_token=self.controller.authRes["data"]["access_token"]
-        )
+        element = ElementOfTenant(bearer_token=self.controller.auth.access_token)
         try:
             res = element.request()
             get = threading.Thread(target=self.process_site_list, args=(res,))
@@ -316,20 +320,22 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     def automate(self) -> None:
         self.automateReport.configure(state=ctk.DISABLED)
-        threadCount: int = 4 if len(self.siteList.index) > 4 else len(self.siteList)
+        thread_count: int = max(4, min(os.cpu_count(), len(self.siteList)))
         data: list = array_split(
-            ary=self.siteList,
-            indices_or_sections=threadCount,
+            ary=(
+                self.siteList if not self.controller.env.dev else self.siteList.head(16)
+            ),
+            indices_or_sections=thread_count,
         )  # HACK: Get Only first (N) of items for dev purposes
         self.queuedRes = queue.Queue()
         workingThreads = []
-        for _ in range(threadCount):
+        for _ in range(thread_count):
             worker = threading.Thread(
                 target=asyncio.run, args=(self.iterate_site(data[_]),)
             )
             worker.start()
             workingThreads.append(worker)
-        self.controller.after(
+        self.master.after(
             100, lambda: self.automate_thread_is_done(workers=workingThreads)
         )
 
@@ -345,7 +351,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             with self.threadLock:
                 self.pendingRes.append(tempRes)
         if not isAllDone:
-            self.controller.after(
+            self.master.after(
                 100,
                 partial(self.automate_thread_is_done, workers=workers, counter=counter),
             )
@@ -408,7 +414,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     async def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
         interfaces = get_all_interfaces(
-            bearer_token=self.controller.authRes["data"]["access_token"],
+            bearer_token=self.controller.auth.access_token,
             site_id=tenant["site_id"],
             element_id=tenant["id"],
         )
@@ -424,7 +430,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             + ".000Z",
             "end_time": dt.strptime(
                 f"{self.dateInput.get()} 00 00",
-                "%m/%d/%y %H %M",
+                "%m/%d/%Y %H %M",
             ).isoformat()
             + ".000Z",
             "interval": "1day",
@@ -433,7 +439,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         }
 
         res = system_metric(
-            bearer_token=self.controller.authRes["data"]["access_token"],
+            bearer_token=self.controller.auth.access_token,
             body=allSum_payload,
         )
 
@@ -443,7 +449,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             interfaces_payload["filter"]["interface"] = filtered_interfaces
             interfaces_payload["view"] = {"individual": "interface", "summary": True}
             interfaceRes = system_metric(
-                bearer_token=self.controller.authRes["data"]["access_token"],
+                bearer_token=self.controller.auth.access_token,
                 body=interfaces_payload,
             )
             filtered_res: dict[str, str | dict] = next(

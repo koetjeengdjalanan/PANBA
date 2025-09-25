@@ -12,7 +12,11 @@ from helper.config import save_config
 
 class SiteConfiguration(ctk.CTkFrame):
     def __init__(self, master, controller) -> None:
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
         self.dataPreview = None
         self.controller = controller
         self.FH = FileHandler()
@@ -128,9 +132,7 @@ class SiteConfiguration(ctk.CTkFrame):
             )
 
     def download_list(self) -> None:
-        download = SiteOfTenant(
-            bearer_token=self.controller.authRes["data"]["access_token"]
-        )
+        download = SiteOfTenant(bearer_token=self.controller.auth.access_token)
         try:
             res = download.request()
             # print(res["data"]["items"])
