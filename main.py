@@ -1,8 +1,12 @@
+"""PANBA Main Application Module."""
+
 import os
+
 import customtkinter as ctk
 from dotenv import load_dotenv
-from helper.config import load_config
 
+from assets.getfile import GetFile
+from helper.config import load_config
 from layout.sidebar import SideBar
 from models import AppController, EnvironmentVariables, ViewsMenuItem
 from view.accountncredentials import AccountNCredentials
@@ -10,16 +14,16 @@ from view.bandwidthconsumption import BandwidthConsumption
 from view.bulkmetricreporting import BulkMetricReporting
 from view.devicemetric import DeviceMetric
 from view.siteconfiguration import SiteConfiguration
-from assets.getfile import GetFile
 
 
 class App(ctk.CTk):
-    """
-    App(ctk.CTk) – Main application window for Palo Alto Network Bulk Automation.
+    """App(ctk.CTk) – Main application window for Palo Alto Network Bulk Automation.
+
     Initializes the custom Tkinter window, loads environment and persisted configuration,
     and constructs a sidebar navigation menu with corresponding view frames.
         start_size (tuple[int, int]): Initial window dimensions as (width, height).
         env (EnvironmentVariables): Environment flags and variables (e.g., dev mode).
+
     Attributes:
         controller (AppController):
             Coordinates application logic, holds environment settings, configuration and auth.
@@ -29,6 +33,7 @@ class App(ctk.CTk):
             The container widget holding sidebar navigation buttons.
         menuList (list[ViewsMenuItem]):
             Definitions of available views, including name, view class, activity and deprecation flags.
+
     Methods:
         activate_menu():
             Enable or disable sidebar buttons based on deprecation status and dev mode.
@@ -40,6 +45,7 @@ class App(ctk.CTk):
     """
 
     def __init__(self, start_size: tuple[int], env: EnvironmentVariables):
+        """Initialize the main application window and its components."""
         super().__init__()
         self.iconbitmap(GetFile.getAssets(file_name="favicon.ico"))
         self.title("Palo Alto Network Bulk Automation")
@@ -95,18 +101,10 @@ class App(ctk.CTk):
         No return value.
         """
         side_bar_child: list[ctk.CTkButton] = [
-            child
-            for child in self.sideBar.winfo_children()
-            if isinstance(child, ctk.CTkButton)
+            child for child in self.sideBar.winfo_children() if isinstance(child, ctk.CTkButton)
         ]
         for index, child in enumerate(side_bar_child):
-            child.configure(
-                state=(
-                    ctk.NORMAL
-                    if not self.menuList[index].is_deprecated
-                    else ctk.DISABLED
-                )
-            )
+            child.configure(state=(ctk.NORMAL if not self.menuList[index].is_deprecated else ctk.DISABLED))
 
     def __draw_menu(self) -> None:
         """
@@ -128,17 +126,11 @@ class App(ctk.CTk):
             ctk.CTkButton(
                 master=self.sideBar,
                 text=menu.name,
-                state=(
-                    ctk.NORMAL
-                    if menu.is_active or self.controller.env.dev
-                    else ctk.DISABLED
-                ),
+                state=(ctk.NORMAL if menu.is_active or self.controller.env.dev else ctk.DISABLED),
                 corner_radius=0,
                 fg_color="transparent",
                 text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"],
-                command=lambda x=(menu.name, idx): self.show_page(
-                    container=x[0], active=x[1]
-                ),
+                command=lambda x=(menu.name, idx): self.show_page(container=x[0], active=x[1]),
             ).pack(fill=ctk.X, pady=1)
             frame = menu.view_class(master=self, controller=self.controller)
             self.frames[menu.name] = frame
@@ -158,21 +150,12 @@ class App(ctk.CTk):
         """
         frame = self.frames[container]
         frame.tkraise()
-        for idx, child in enumerate(
-            [i for i in self.sideBar.winfo_children() if isinstance(i, ctk.CTkButton)]
-        ):
-            child.configure(
-                fg_color=(
-                    ctk.ThemeManager.theme["CTk"]["fg_color"]
-                    if idx == active
-                    else "transparent"
-                )
-            )
+        for idx, child in enumerate([i for i in self.sideBar.winfo_children() if isinstance(i, ctk.CTkButton)]):
+            child.configure(fg_color=(ctk.ThemeManager.theme["CTk"]["fg_color"] if idx == active else "transparent"))
 
 
 def environment() -> EnvironmentVariables:
-    """
-    Load environment variables from a .env file and return them as an EnvironmentVariables instance.
+    """Load environment variables from a .env file and return them as an EnvironmentVariables instance.
 
     This function reads a .env file in the project root (./.env), loads its contents into the
     environment, and constructs an EnvironmentVariables object with the following fields:
@@ -194,5 +177,6 @@ def environment() -> EnvironmentVariables:
     return EnvironmentVariables(**data)
 
 
-app = App(start_size=(1190, 620), env=environment())
-app.mainloop()
+if __name__ == "__main__":
+    app = App(start_size=(1190, 620), env=environment())
+    app.mainloop()

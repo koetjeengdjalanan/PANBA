@@ -1,28 +1,30 @@
+"""Bulk Metric Reporting View."""
+
+import asyncio
 import os
-from pathlib import Path
 import queue
 import threading
-import asyncio
-import customtkinter as ctk
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import pandas as pd
-import helper.logwriter as lw
-
-from time import time
-from numpy import array_split
-from tkinter import messagebox
-from functools import partial
-from tkcalendar import DateEntry
 from datetime import datetime as dt
-from requests.exceptions import HTTPError
-from dateutil.relativedelta import relativedelta as rdt
+from functools import partial
+from pathlib import Path
+from time import time
+from tkinter import messagebox
 
+import customtkinter as ctk
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
+from dateutil.relativedelta import relativedelta as rdt
+from numpy import array_split
+from requests.exceptions import HTTPError
+from tkcalendar import DateEntry
+
+import helper.logwriter as lw
 from helper.api.getlist import ElementOfTenant
-from helper.filehandler import FileHandler
-from helper.processing import average_per_site, filter_interfaces
 from helper.api.plainfunc import get_all_interfaces, system_metric
 from helper.config import save_config
+from helper.filehandler import FileHandler
+from helper.processing import average_per_site, filter_interfaces
 from models import AppController
 
 
@@ -78,9 +80,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         # Prefill output directory from config if available
         try:
             paths_cfg = (
-                self.controller.config.get("paths")
-                if isinstance(self.controller.config.get("paths"), dict)
-                else None
+                self.controller.config.get("paths") if isinstance(self.controller.config.get("paths"), dict) else None
             )
             if paths_cfg and paths_cfg.get("last_export_dir"):
                 self.destDirectory = paths_cfg.get("last_export_dir")
@@ -108,21 +108,17 @@ class BulkMetricReporting(ctk.CTkFrame):
         datePickerFrame = ctk.CTkFrame(master=settingFrame, fg_color="transparent")
         datePickerFrame.grid(padx=10, pady=10, column=0, row=0, sticky="nsew")
         datePickerFrame.grid_columnconfigure(index=0, weight=1)
-        ctk.CTkLabel(
-            master=datePickerFrame, text="Date Setting", font=("roboto", 20)
-        ).grid(column=0, row=0)
+        ctk.CTkLabel(master=datePickerFrame, text="Date Setting", font=("roboto", 20)).grid(column=0, row=0)
         self.date_picker(parent=datePickerFrame)
 
         ### # Site List # ###
         siteListFrame = ctk.CTkFrame(master=settingFrame, fg_color="transparent")
         siteListFrame.grid(padx=10, pady=10, column=1, row=0, sticky="nsew")
         siteListFrame.grid_columnconfigure(index=0, weight=1)
-        ctk.CTkLabel(master=siteListFrame, text="Site list", font=("roboto", 20)).grid(
-            column=0, row=0, sticky=ctk.E
+        ctk.CTkLabel(master=siteListFrame, text="Site list", font=("roboto", 20)).grid(column=0, row=0, sticky=ctk.E)
+        ctk.CTkButton(master=siteListFrame, text="Get Data", command=self.get_site_list).grid(
+            column=1, row=0, padx=5, pady=5, columnspan=2, sticky=ctk.EW
         )
-        ctk.CTkButton(
-            master=siteListFrame, text="Get Data", command=self.get_site_list
-        ).grid(column=1, row=0, padx=5, pady=5, columnspan=2, sticky=ctk.EW)
         self.safeDataButton = ctk.CTkButton(
             master=siteListFrame,
             text="Save as Excel",
@@ -137,17 +133,15 @@ class BulkMetricReporting(ctk.CTkFrame):
             command=self.automate,
         )
         self.automateReport.grid(column=2, row=1, padx=5, pady=5)
-        ctk.CTkLabel(
-            master=siteListFrame, text="Other Config", font=("roboto", 10)
-        ).grid(column=0, row=2, sticky=ctk.E)
+        ctk.CTkLabel(master=siteListFrame, text="Other Config", font=("roboto", 10)).grid(column=0, row=2, sticky=ctk.E)
         self.generatePlots = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(
-            master=siteListFrame, variable=self.generatePlots, text="Generate Plots"
-        ).grid(column=1, row=2, padx=5, pady=5, sticky=ctk.N)
+        ctk.CTkSwitch(master=siteListFrame, variable=self.generatePlots, text="Generate Plots").grid(
+            column=1, row=2, padx=5, pady=5, sticky=ctk.N
+        )
         self.debugState = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(
-            master=siteListFrame, variable=self.debugState, text="Debug Mode"
-        ).grid(column=2, row=2, padx=5, pady=5, sticky=ctk.N)
+        ctk.CTkSwitch(master=siteListFrame, variable=self.debugState, text="Debug Mode").grid(
+            column=2, row=2, padx=5, pady=5, sticky=ctk.N
+        )
 
         ### Progress Bar ###
         progressFrame = ctk.CTkFrame(master=self)
@@ -177,9 +171,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         ### Log Frame ###
         logFrame = ctk.CTkFrame(master=self)
         logFrame.pack(fill=ctk.BOTH, expand=True, padx=10, pady=10)
-        self.logTerminal = ctk.CTkTextbox(
-            master=logFrame, wrap="none", state="disabled"
-        )
+        self.logTerminal = ctk.CTkTextbox(master=logFrame, wrap="none", state="disabled")
         self.logTerminal.pack(fill=ctk.BOTH, expand=True, pady=5, padx=5)
 
     def pick_dest_dir(self) -> None:
@@ -202,17 +194,13 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.outputDirEntry.configure(state=ctk.DISABLED)
         # Persist last_export_dir for future defaults
         try:
-            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
-                self.destDirectory
-            )
+            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(self.destDirectory)
             save_config(self.controller.config)
         except Exception:
             pass
 
     def date_picker(self, parent) -> None:
-        ctk.CTkLabel(master=parent, text="Choose Date:").grid(
-            column=0, row=1, padx=5, pady=5, sticky=ctk.W
-        )
+        ctk.CTkLabel(master=parent, text="Choose Date:").grid(column=0, row=1, padx=5, pady=5, sticky=ctk.W)
         dateInput = DateEntry(
             master=parent,
             textvariable=self.dateInput,
@@ -222,9 +210,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         )
         dateInput.grid(column=1, row=1, padx=5, pady=5, columnspan=2, sticky=ctk.E)
         dateInput.bind("<<DateEntrySelected>>", self.on_date_pick)
-        ctk.CTkLabel(master=parent, text="Duration:").grid(
-            column=0, row=2, padx=5, pady=5, sticky=ctk.W
-        )
+        ctk.CTkLabel(master=parent, text="Duration:").grid(column=0, row=2, padx=5, pady=5, sticky=ctk.W)
         self.durationLabel = ctk.CTkLabel(master=parent, text="90 Day(s)")
         self.durationLabel.grid(column=2, row=2, padx=5, pady=5, sticky=ctk.E)
         self.dateSlider = ctk.CTkSlider(
@@ -241,15 +227,11 @@ class BulkMetricReporting(ctk.CTkFrame):
         maxDiff = 90 - (self.now - dt.strptime(self.dateInput.get(), "%m/%d/%y")).days
         if self.dateDuration.get() > maxDiff:
             self.dateDuration.set(maxDiff)
-        self.dateSlider.configure(
-            to=maxDiff, number_of_steps=maxDiff - 1, require_redraw=True
-        )
+        self.dateSlider.configure(to=maxDiff, number_of_steps=maxDiff - 1, require_redraw=True)
         self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
 
     def date_ago_pick(self, event=None) -> None:
-        self.agoDate = dt.strptime(self.dateInput.get(), "%m/%d/%y") - rdt(
-            days=(self.dateSlider.get() - 1)
-        )
+        self.agoDate = dt.strptime(self.dateInput.get(), "%m/%d/%y") - rdt(days=(self.dateSlider.get() - 1))
         self.dateAgo = ctk.StringVar(value=self.agoDate.strftime(format="%m/%d/%Y"))
         self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
 
@@ -293,25 +275,17 @@ class BulkMetricReporting(ctk.CTkFrame):
                 "hw_id": hwId,
             }
         )
-        lw.text_view_render(
-            widget=self.logTerminal, log="number of sites: " + str(len(self.siteList))
-        )
+        lw.text_view_render(widget=self.logTerminal, log="number of sites: " + str(len(self.siteList)))
         self.numberOfSites = len(self.siteList)
         self.safeDataButton.configure(state=ctk.ACTIVE)
         self.automateReport.configure(state=ctk.ACTIVE)
 
     def save_data(self) -> None:
-        self.FH.save_file_loc(dirStr=self.destDirectory).export_excel(
-            data=self.siteList
-        )
-        lw.text_view_render(
-            widget=self.logTerminal, log="file saved: " + str(self.FH.savedFile)
-        )
+        self.FH.save_file_loc(dirStr=self.destDirectory).export_excel(data=self.siteList)
+        lw.text_view_render(widget=self.logTerminal, log="file saved: " + str(self.FH.savedFile))
         # Remember export dir after save
         try:
-            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
-                self.destDirectory
-            )
+            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(self.destDirectory)
             save_config(self.controller.config)
         except Exception:
             pass
@@ -322,22 +296,16 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.automateReport.configure(state=ctk.DISABLED)
         thread_count: int = max(4, min(os.cpu_count(), len(self.siteList)))
         data: list = array_split(
-            ary=(
-                self.siteList if not self.controller.env.dev else self.siteList.head(16)
-            ),
+            ary=(self.siteList if not self.controller.env.dev else self.siteList.head(16)),
             indices_or_sections=thread_count,
         )  # HACK: Get Only first (N) of items for dev purposes
         self.queuedRes = queue.Queue()
         workingThreads = []
         for _ in range(thread_count):
-            worker = threading.Thread(
-                target=asyncio.run, args=(self.iterate_site(data[_]),)
-            )
+            worker = threading.Thread(target=asyncio.run, args=(self.iterate_site(data[_]),))
             worker.start()
             workingThreads.append(worker)
-        self.master.after(
-            100, lambda: self.automate_thread_is_done(workers=workingThreads)
-        )
+        self.master.after(100, lambda: self.automate_thread_is_done(workers=workingThreads))
 
     def automate_thread_is_done(self, workers: list, counter: int = 0) -> None:
         isAllDone: bool = all(not worker.is_alive() for worker in workers)
@@ -345,9 +313,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             tempRes = self.queuedRes.get()
             counter += 1
             self.automateFloatProgress.set(counter / self.numberOfSites)
-            self.automateStringProgress.set(
-                f"{self.automateFloatProgress.get() * 100:.2f} %"
-            )
+            self.automateStringProgress.set(f"{self.automateFloatProgress.get() * 100:.2f} %")
             with self.threadLock:
                 self.pendingRes.append(tempRes)
         if not isAllDone:
@@ -360,12 +326,8 @@ class BulkMetricReporting(ctk.CTkFrame):
                 fileName="site_list_with_resource_metric.xlsx",
                 promptDialog=False,
                 dirStr=self.destDirectory,
-            ).export_excel(
-                data=pd.DataFrame(self.pendingRes).reset_index(drop=True)
-            ).open_explorer()
-            lw.text_view_render(
-                widget=self.logTerminal, log="All Done!, Excel File exported"
-            )
+            ).export_excel(data=pd.DataFrame(self.pendingRes).reset_index(drop=True)).open_explorer()
+            lw.text_view_render(widget=self.logTerminal, log="All Done!, Excel File exported")
             if self.debugState.get():
                 lw.save_log_to_file(self.logTerminal)
             self.automateReport.configure(state=ctk.ACTIVE)
@@ -383,9 +345,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             isError = False
             tempRes = pd.Series()
             start_time = time()
-            lw.text_view_render(
-                widget=self.logTerminal, log=f"Working for  : {index} - {row['name']}"
-            )
+            lw.text_view_render(widget=self.logTerminal, log=f"Working for  : {index} - {row['name']}")
             try:
                 rawData = await self.generate_data(tenant=row)
                 tempRes = average_per_site(tenant=row, rawData=rawData)
@@ -469,9 +429,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         os.makedirs(name=f"{self.destDirectory}/{site}", exist_ok=True)
         for metric in rawData["data"]["metrics"]:
             try:
-                data = pd.DataFrame(
-                    data=metric["series"][0]["data"][0]["datapoints"]
-                ).set_index("time")
+                data = pd.DataFrame(data=metric["series"][0]["data"][0]["datapoints"]).set_index("time")
                 data.index = pd.to_datetime(data.index)
                 maxPercentage = data["value"].idxmax()
                 minPercentage = data["value"].idxmin()

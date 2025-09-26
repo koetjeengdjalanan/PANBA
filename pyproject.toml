@@ -1,9 +1,69 @@
 [project]
 name = "PANBA-NTT"
-version = "1.2.5"
+version = "1.2.7"
 description = "Retiteration from PaloAltoNetworkBulkAutomation"
 authors = [
     { name = "Martin Sambulare", email = "martin.sambulare@nttindonesia.com" },
 ]
-requires-python = ">=3.11.6"
-classifiers = ["Developers Status :: 3 - Alpha", "Natural Language :: English"]
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 5 - Stable",
+    "Intended Audience :: Users and Administrators",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "customtkinter==5.2.2",
+    "matplotlib==3.8.4",
+    "networkx==3.5",
+    "numpy==1.26.4",
+    "openpyxl==3.1.2",
+    "pandas==2.2.1",
+    "pyinstaller==6.13.0",
+    "python-dotenv==1.0.1",
+    "requests==2.31.0",
+    "scipy==1.13.0",
+    "tkcalendar==1.6.1",
+    "tksheet==7.1.7",
+    "xlsxwriter==3.2.0",
+]
+
+[project.urls]
+Repository = "https://github.com/koetjeengdjalanan/PANBA"
+Download = "https://github.com/koetjeengdjalanan/PANBA/releases"
+
+[dependency-groups]
+code = ["black>=25.9.0", "isort>=6.0.1", "ruff>=0.13.2"]
+dev = ["ipykernel>=6.29.4", "ipython>=8.23.0"]
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+    "debug.py",
+    "build",
+    "dist",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    "*.so",
+    "*.dylib",
+    "*.dll",
+]
+
+select = ["E", "W", "F", "I", "D"]
+ignore = ["D212", "D107"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.pydocstyle]
+convention = "google"

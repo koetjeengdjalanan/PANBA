@@ -5,22 +5,22 @@ credentials into the Windows per-user AppData config directory using a single
 JSON file. Sensitive fields (secrets) are protected with Windows DPAPI and
 encoded as base64 strings in the config.
 
-Notes
+Notes:
 -----
 - No changes are made to existing files by importing this module.
 - Integration into UI (app.py, views) will require code changes and your
-  confirmation before proceeding.
+    confirmation before proceeding.
 """
 
 from __future__ import annotations
 
-from base64 import b64decode, b64encode
-from pathlib import Path
-from typing import Any, Dict, TypedDict, cast
 import json
 import logging
 import os
 import sys
+from base64 import b64decode, b64encode
+from pathlib import Path
+from typing import Any, Dict, TypedDict, cast
 
 from platformdirs import user_config_dir
 
@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 class UIOverrides(TypedDict, total=False):
     """UI-related defaults and flags.
 
-    Attributes
+    Attributes:
     ----------
     remember_me: bool
         Whether to persist credentials on successful login.
@@ -52,7 +52,7 @@ class UIOverrides(TypedDict, total=False):
 class Paths(TypedDict, total=False):
     """Last used directories for dialogs.
 
-    Attributes
+    Attributes:
     ----------
     last_open_dir: str
         Last directory used for opening files.
@@ -73,7 +73,7 @@ class Paths(TypedDict, total=False):
 class Auth(TypedDict, total=False):
     """Authentication profile (username, tenant, secret).
 
-    Attributes
+    Attributes:
     ----------
     username: str
         Last used username (non-sensitive).
@@ -91,7 +91,7 @@ class Auth(TypedDict, total=False):
 class Config(TypedDict, total=False):
     """Top-level configuration shape.
 
-    Attributes
+    Attributes:
     ----------
     version: str
         Semantic version of the config schema, for future migrations.
@@ -110,18 +110,14 @@ class Config(TypedDict, total=False):
 
 
 def get_config_path() -> Path:
-    """Return absolute path to PANBA config file (does not create the file).
+    r"""Return absolute path to PANBA config file (does not create the file).
 
-    Uses platformdirs to resolve a per-user config directory on Windows, e.g.::
+    Uses platformdirs to resolve a per-user config directory on Windows, e.g.:
+        \%LOCALAPPDATA\%\\PANBA\\config.json
 
-        %LOCALAPPDATA%\\PANBA\\config.json
-
-    Returns
-    -------
-    Path
-        The path to the JSON configuration file.
+    Returns:
+        Path: The path to the JSON configuration file.
     """
-
     config_dir: str = user_config_dir(appname="PANBA", appauthor="NTTIndonesia")
     path: Path = Path(config_dir).expanduser().absolute()
     # Ensure directory exists quickly; this is idempotent and fast
@@ -134,7 +130,6 @@ def default_config() -> Config:
 
     Provides sensible defaults to minimize user input on first run.
     """
-
     return cast(
         Config,
         {
@@ -170,12 +165,9 @@ def _merge_defaults(cfg: Dict[str, Any]) -> Config:
     cfg : dict
         Partially populated configuration loaded from disk.
 
-    Returns
-    -------
-    Config
-        A config with all required keys present.
+    Returns:
+        Config: A config with all required keys present.
     """
-
     base: Config = default_config()
     # Shallow merge first-level keys quickly
     for key, value in base.items():
@@ -216,17 +208,14 @@ def encrypt_secret(plain: str) -> str:
     plain : str
         The secret to encrypt.
 
-    Returns
-    -------
-    str
-        Base64-encoded DPAPI-protected bytes suitable for JSON storage.
+    Returns:
+        str: Base64-encoded DPAPI-protected bytes suitable for JSON storage.
 
-    Raises
+    Raises:
     ------
     RuntimeError
         If DPAPI is unavailable (non-Windows or pywin32 missing).
     """
-
     if sys.platform != "win32" or win32crypt is None:  # pragma: no cover
         raise RuntimeError("DPAPI encryption requires Windows and pywin32 installed")
     if plain == "":
@@ -243,17 +232,15 @@ def decrypt_secret(cipher_b64: str) -> str:
     cipher_b64 : str
         Base64 string returned by :func:`encrypt_secret`.
 
-    Returns
+    Returns:
     -------
-    str
-        Decrypted secret. Empty string if input is empty.
+        str: Decrypted secret. Empty string if input is empty.
 
-    Raises
+    Raises:
     ------
     RuntimeError
         If DPAPI is unavailable.
     """
-
     if cipher_b64 == "":
         return ""
     if sys.platform != "win32" or win32crypt is None:  # pragma: no cover
@@ -274,12 +261,9 @@ def load_config(path: Path | None = None) -> Config:
     path : Path | None
         Optional override path; defaults to :func:`get_config_path`.
 
-    Returns
-    -------
-    Config
-        A usable configuration dictionary.
+    Returns:
+        Config: A usable configuration dictionary.
     """
-
     cfg_path: Path = path or get_config_path()
     if not cfg_path.exists():
         return default_config()
@@ -306,7 +290,6 @@ def save_config(cfg: Config, path: Path | None = None) -> None:
     path : Path | None
         Optional override path; defaults to :func:`get_config_path`.
     """
-
     cfg_path: Path = path or get_config_path()
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Path = cfg_path.with_suffix(".json.tmp")

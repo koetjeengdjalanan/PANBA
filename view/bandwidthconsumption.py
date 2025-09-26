@@ -1,16 +1,40 @@
+"""Bandwidth Consumption View Module."""
+
 import traceback
 from pathlib import Path
+
 import customtkinter as ctk
 import pandas as pd
-from helper.api.getlist import RemoteNetworkBandwidth
-from helper.filehandler import FileHandler
+
 import helper.logwriter as lw
-from helper.settings.apisettings import BWConsSetting
+from helper.api.getlist import RemoteNetworkBandwidth
 from helper.config import save_config
+from helper.filehandler import FileHandler
+from helper.settings.apisettings import BWConsSetting
 from models import AppController
 
 
 class BandwidthConsumption(ctk.CTkFrame):
+    # Class docstring
+    """
+    BandwidthConsumption(ctk.CTkFrame).
+
+    A custom frame that provides a user interface for configuring and exporting
+    network bandwidth consumption data. It includes:
+    - Output file path selection with persistence of last used directory.
+    - Duration selection slider for filtering data by last N days.
+    - Checkboxes to select properties to include in the export.
+    - A log view to display status messages and errors.
+
+    Attributes:
+        controller (AppController): Reference to the application controller for
+            accessing configuration and authentication.
+        FH (FileHandler): Handles file selection and exporting data to Excel.
+        outputPath (ctk.StringVar): Holds the path of the selected output file.
+        daysAgo (ctk.IntVar): Duration in days for data filtering (default 90).
+        logBox (ctk.CTkTextbox): Textbox for displaying log messages.
+    """
+
     def __init__(self, master: ctk.CTk, controller: AppController):
         super().__init__(
             master=master,
@@ -115,7 +139,7 @@ class BandwidthConsumption(ctk.CTkFrame):
         ctk.CTkButton(
             master=outputFrame,
             text="Export",
-            command=self.export_data,
+            command=self.__export_data,
         ).pack(fill=ctk.X, expand=True, pady=5)
 
     def __prop_select(self):
@@ -143,7 +167,7 @@ class BandwidthConsumption(ctk.CTkFrame):
                 padx=5,
             )
 
-    def export_data(self):
+    def __export_data(self):
         propList = [
             {"property": prop}
             for prop in BWConsSetting.propState

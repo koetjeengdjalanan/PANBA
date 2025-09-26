@@ -1,13 +1,16 @@
+"""Site Configuration View."""
+
 import threading
 from pathlib import Path
+from tkinter import messagebox
+
 import customtkinter as ctk
 import pandas as pd
-
-from tkinter import messagebox
 from tksheet import Sheet
+
 from helper.api.getlist import SiteOfTenant
-from helper.filehandler import FileHandler
 from helper.config import save_config
+from helper.filehandler import FileHandler
 
 
 class SiteConfiguration(ctk.CTkFrame):
@@ -23,9 +26,7 @@ class SiteConfiguration(ctk.CTkFrame):
         # Prefill initial directory from config if available
         try:
             paths_cfg = (
-                self.controller.config.get("paths")
-                if isinstance(self.controller.config.get("paths"), dict)
-                else None
+                self.controller.config.get("paths") if isinstance(self.controller.config.get("paths"), dict) else None
             )
             if paths_cfg and paths_cfg.get("last_import_dir"):
                 self.FH.initDir = Path(paths_cfg.get("last_import_dir"))
@@ -57,9 +58,7 @@ class SiteConfiguration(ctk.CTkFrame):
         # Prefill last selected file path if available
         try:
             paths_cfg = (
-                self.controller.config.get("paths")
-                if isinstance(self.controller.config.get("paths"), dict)
-                else None
+                self.controller.config.get("paths") if isinstance(self.controller.config.get("paths"), dict) else None
             )
             if paths_cfg and paths_cfg.get("last_import_file"):
                 self.filePickerEntry.delete(0, ctk.END)
@@ -81,9 +80,7 @@ class SiteConfiguration(ctk.CTkFrame):
         self.fileViewerFrame.pack(pady=(0, 10), fill=ctk.BOTH, expand=True)
 
         ### Automation Execute ###
-        self.automationExecuteFrame = ctk.CTkFrame(
-            master=self.fileManipulationFrame, fg_color="transparent"
-        )
+        self.automationExecuteFrame = ctk.CTkFrame(master=self.fileManipulationFrame, fg_color="transparent")
         self.automationExecuteFrame.pack(fill="x", expand=False)
         ctk.CTkButton(
             master=self.automationExecuteFrame,
@@ -108,12 +105,8 @@ class SiteConfiguration(ctk.CTkFrame):
         self.FH.sourceFile = Path(selected_file)
         # Persist last import dir and file
         try:
-            self.controller.config.setdefault("paths", {})["last_import_dir"] = str(
-                self.FH.sourceFile.parent
-            )
-            self.controller.config.setdefault("paths", {})["last_import_file"] = str(
-                self.FH.sourceFile
-            )
+            self.controller.config.setdefault("paths", {})["last_import_dir"] = str(self.FH.sourceFile.parent)
+            self.controller.config.setdefault("paths", {})["last_import_file"] = str(self.FH.sourceFile)
             save_config(self.controller.config)
         except Exception:
             pass
@@ -138,11 +131,7 @@ class SiteConfiguration(ctk.CTkFrame):
             # print(res["data"]["items"])
         except Exception as error:
             messagebox.showerror(title="Something Went Wrong!", message=error)
-        self.dataPreview = pd.DataFrame(
-            data=[
-                self.FH.flatten_dict(data=row, level=1) for row in res["data"]["items"]
-            ]
-        )
+        self.dataPreview = pd.DataFrame(data=[self.FH.flatten_dict(data=row, level=1) for row in res["data"]["items"]])
         self.__show_data()
 
     def __show_data(self) -> None:
@@ -168,18 +157,12 @@ class SiteConfiguration(ctk.CTkFrame):
                 dir_hint = paths_cfg.get("last_export_dir") if paths_cfg else None
             except Exception:
                 dir_hint = None
-            self.FH.save_file_loc(dirStr=dir_hint or self.FH.destDir).export_excel(
-                data=self.dataPreview
-            )
+            self.FH.save_file_loc(dirStr=dir_hint or self.FH.destDir).export_excel(data=self.dataPreview)
             # Persist last export directory
             try:
-                self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
-                    self.FH.savedFile.parent
-                )
+                self.controller.config.setdefault("paths", {})["last_export_dir"] = str(self.FH.savedFile.parent)
                 save_config(self.controller.config)
             except Exception:
                 pass
         else:
-            messagebox.showerror(
-                title="Something Went Wrong!", message="No Data Selected!"
-            )
+            messagebox.showerror(title="Something Went Wrong!", message="No Data Selected!")
