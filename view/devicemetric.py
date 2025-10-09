@@ -1,22 +1,24 @@
 import functools
+
 import customtkinter as ctk
 import matplotlib
 
 matplotlib.use("agg")
+from datetime import datetime as dt
+from datetime import timedelta
+
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
 import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from datetime import datetime as dt, timedelta
+from matplotlib.ticker import AutoMinorLocator
 
 from helper.api.monitor import SysMetric
 from view.toplevel.metricvariablesetting import MetricVariableSetting
 
 
 class DeviceMetric(ctk.CTkFrame):
-    def __init__(self, master, controller):
+    def __init__(self, master):
         super().__init__(master=master, fg_color="transparent")
-        self.controller = controller
         self.varSetting = None
         self.toDate = dt.now()
         self.fromDate = self.toDate - timedelta(days=7)
@@ -57,24 +59,22 @@ class DeviceMetric(ctk.CTkFrame):
         #     master=self.graphWindow, text="Open Setting", command=self.open_var_setting
         # ).pack(anchor=ctk.CENTER)
         self.graphWindow.columnconfigure(0, weight=1)
-        ctk.CTkButton(
-            master=self.graphWindow, text="Render", command=self.on_confirm
-        ).grid(padx=10, pady=(10, 15), sticky=ctk.E, row=0)
+        ctk.CTkButton(master=self.graphWindow, text="Render", command=self.on_confirm).grid(
+            padx=10, pady=(10, 15), sticky=ctk.E, row=0
+        )
 
     def open_var_setting(self, event=None):
         if self.varSetting is None or not self.varSetting.winfo_exists():
             self.varSetting = MetricVariableSetting(
                 master=self,
                 controller=self,
-                # bearer_token=self.controller.authRes["data"]["access_token"],
+                # bearer_token=self.master.controller.authRes["data"]["access_token"],
                 # data=self.bodyVars,
             )
             self.varSetting.grab_set()
             # self.varSettingData = self.varSetting.bodyVars
             # print("Binding on_confirm to WM_DELETE_WINDOW")
-            self.varSetting.protocol(
-                "WM_DELETE_WINDOW", functools.partial(self.on_confirm)
-            )
+            self.varSetting.protocol("WM_DELETE_WINDOW", functools.partial(self.on_confirm))
         else:
             self.varSetting.focus()
 
@@ -84,7 +84,7 @@ class DeviceMetric(ctk.CTkFrame):
             bodyJson["metrics"] = self.metrics
             bodyJson["filter"] = {"site": [element[0]], "element": [element[1]]}
             SM = SysMetric(
-                bearer_token=self.controller.authRes["data"]["access_token"],
+                bearer_token=self.master.controller.authRes["data"]["access_token"],
                 body=bodyJson,
             )
             res = SM.request()

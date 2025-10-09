@@ -4,15 +4,17 @@ import os
 
 import customtkinter as ctk
 from dotenv import load_dotenv
+from dotenv.main import StrPath
 
 from assets.getfile import GetFile
-from helper.config import load_config
+from helper.config import load_config, save_config
 from layout.sidebar import SideBar
 from models import AppController, EnvironmentVariables, ViewsMenuItem
 from view.accountncredentials import AccountNCredentials
 from view.bandwidthconsumption import BandwidthConsumption
 from view.bulkmetricreporting import BulkMetricReporting
 from view.devicemetric import DeviceMetric
+from view.pathfinder import PathFinder
 from view.siteconfiguration import SiteConfiguration
 
 
@@ -44,9 +46,10 @@ class App(ctk.CTk):
             Raise the specified frame to the front and highlight the active sidebar button.
     """
 
-    def __init__(self, start_size: tuple[int], env: EnvironmentVariables):
+    def __init__(self, start_size: tuple[int, int], env: EnvironmentVariables):
         """Initialize the main application window and its components."""
         super().__init__()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.iconbitmap(GetFile.getAssets(file_name="favicon.ico"))
         self.title("Palo Alto Network Bulk Automation")
         self.geometry(f"{start_size[0]}x{start_size[1]}")
@@ -59,6 +62,7 @@ class App(ctk.CTk):
             auth=None,
         )
         self.frames: dict[str, ctk.CTkFrame] = {}
+        self._set_appearance_mode(self.controller.config.ui.default_theme)
 
         # Side Bar
         self.sideBar = SideBar(master=self, start_pos=0, end_pos=0.2)
@@ -86,8 +90,22 @@ class App(ctk.CTk):
                 name="Bandwidth Consumption",
                 view_class=BandwidthConsumption,
             ),
+            ViewsMenuItem(name="Path Finder", view_class=PathFinder, is_active=True),
         ]
         self.__draw_menu()
+
+    def _on_close(self):
+        """Persist configuration on application exit."""
+        import glob
+        import tempfile
+
+        save_config(cfg=self.controller.config)
+        for temp_file in glob.iglob("panba_*.*", root_dir=tempfile.gettempdir()):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
+        self.destroy()
 
     def activate_menu(self) -> None:
         """
@@ -132,10 +150,15 @@ class App(ctk.CTk):
                 text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"],
                 command=lambda x=(menu.name, idx): self.show_page(container=x[0], active=x[1]),
             ).pack(fill=ctk.X, pady=1)
-            frame = menu.view_class(master=self, controller=self.controller)
+            frame = menu.view_class(master=self)
             self.frames[menu.name] = frame
             frame.place(relx=0.2, rely=0, relwidth=0.8, relheight=1)
-        self.show_page(container=next(iter(self.frames)), active=0)
+        first_view: str = (
+            self.controller.env.first_view
+            if self.controller.env.dev and self.controller.env.first_view in self.frames
+            else next(iter(self.frames))
+        )
+        self.show_page(container=first_view, active=0)
 
     def show_page(self, container: str, active: int) -> None:
         """
@@ -154,7 +177,7 @@ class App(ctk.CTk):
             child.configure(fg_color=(ctk.ThemeManager.theme["CTk"]["fg_color"] if idx == active else "transparent"))
 
 
-def environment() -> EnvironmentVariables:
+def environment(env_file_path: StrPath = "./.env") -> EnvironmentVariables:
     """Load environment variables from a .env file and return them as an EnvironmentVariables instance.
 
     This function reads a .env file in the project root (./.env), loads its contents into the
@@ -163,16 +186,21 @@ def environment() -> EnvironmentVariables:
         userName (str | None): The value of the USER_NAME environment variable.
         secret (str | None): The value of the SECRET_STRING environment variable.
         tsgId (str | None): The value of the TSG_ID environment variable.
+        first_view (str | None): The value of the FIRST_VIEW environment variable.
+
+    Args:
+        env_file_path (StrPath): Path to the .env file. Defaults to "./.env".
 
     Returns:
         EnvironmentVariables: A dataclass populated with the loaded environment values.
     """
-    load_dotenv(dotenv_path="./.env")
+    load_dotenv(dotenv_path=env_file_path)
     data = {
         "dev": True if os.getenv("DEV") == "true" else False,
         "userName": os.getenv("USER_NAME"),
         "secret": os.getenv("SECRET_STRING"),
         "tsgId": os.getenv("TSG_ID"),
+        "first_view": os.getenv("FIRST_VIEW"),
     }
     return EnvironmentVariables(**data)
 

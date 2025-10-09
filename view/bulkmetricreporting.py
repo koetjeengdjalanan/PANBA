@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from time import time
 from tkinter import messagebox
+from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 import matplotlib.dates as mdates
@@ -25,18 +26,19 @@ from helper.api.plainfunc import get_all_interfaces, system_metric
 from helper.config import save_config
 from helper.filehandler import FileHandler
 from helper.processing import average_per_site, filter_interfaces
-from models import AppController
+
+if TYPE_CHECKING:
+    from main import App
 
 
 class BulkMetricReporting(ctk.CTkFrame):
-    def __init__(self, master: ctk.CTk, controller: AppController) -> None:
+    def __init__(self, master: ctk.CTk) -> None:
         super().__init__(
             master=master,
             fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
             corner_radius=None,
         )
-        self.controller = controller
-        self.master = master
+        self.master: "App" = master
         self.FH = FileHandler()
         # Default destination directory string used for exports; set early
         self.destDirectory = str(self.FH.destDir) if hasattr(self.FH, "destDir") else ""
@@ -63,13 +65,13 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         ### Output Dir ###
         outputDirFrame = ctk.CTkFrame(master=self)
-        outputDirFrame.pack(fill="x", anchor="n", padx=10, pady=10, expand=True)
+        outputDirFrame.pack(fill=ctk.X, anchor=ctk.N, padx=10, pady=10, expand=True)
         self.outputDirEntry = ctk.CTkEntry(
             master=outputDirFrame,
             placeholder_text="Output Directory ...",
             state=ctk.DISABLED,
         )  # TODO: Make Text Entry change value on Input
-        self.outputDirEntry.pack(pady=10, padx=10, side="left", fill="x", expand=True)
+        self.outputDirEntry.pack(pady=10, padx=10, side="left", fill=ctk.X, expand=True)
         ctk.CTkButton(
             master=outputDirFrame,
             text="Set Directory ",
@@ -79,28 +81,18 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         # Prefill output directory from config if available
         try:
-            paths_cfg = (
-                self.controller.config.get("paths") if isinstance(self.controller.config.get("paths"), dict) else None
-            )
-            if paths_cfg and paths_cfg.get("last_export_dir"):
-                self.destDirectory = paths_cfg.get("last_export_dir")
-                # Sync FileHandler defaults for subsequent dialogs
-                try:
-                    self.FH.destDir = Path(self.destDirectory)
-                    self.FH.initDir = Path(self.destDirectory)
-                except Exception:
-                    pass
-                # Update entry text
-                self.outputDirEntry.configure(state=ctk.NORMAL)
-                self.outputDirEntry.delete(0, ctk.END)
-                self.outputDirEntry.insert(0, self.destDirectory)
-                self.outputDirEntry.configure(state=ctk.DISABLED)
+            self.FH.destDir = self.master.controller.config.paths.last_export_dir
+            self.FH.initDir = self.master.controller.config.paths.last_export_dir
+            self.outputDirEntry.configure(state=ctk.NORMAL)
+            self.outputDirEntry.delete(0, ctk.END)
+            self.outputDirEntry.insert(0, self.FH.destDir)
+            self.outputDirEntry.configure(state=ctk.DISABLED)
         except Exception:
             pass
 
         ### Setting Frame ###
         settingFrame = ctk.CTkFrame(master=self)
-        settingFrame.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        settingFrame.pack(fill=ctk.X, padx=10, pady=(0, 10), expand=True)
         settingFrame.grid_rowconfigure(index=0, weight=1)
         settingFrame.grid_columnconfigure(index=0, weight=1)
 
@@ -145,7 +137,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         ### Progress Bar ###
         progressFrame = ctk.CTkFrame(master=self)
-        progressFrame.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        progressFrame.pack(fill=ctk.X, padx=10, pady=(0, 10), expand=True)
         self.automateStringProgress = ctk.StringVar(
             master=self,
             name="automateStringProgress",
@@ -162,7 +154,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             mode="determinate",
             variable=self.automateFloatProgress,
         )
-        self.progressBar.pack(fill="x", padx=10, pady=10, expand=True, side=ctk.LEFT)
+        self.progressBar.pack(fill=ctk.X, padx=10, pady=10, expand=True, side=ctk.LEFT)
         ctk.CTkLabel(
             master=progressFrame,
             textvariable=self.automateStringProgress,
@@ -170,7 +162,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
         ### Log Frame ###
         logFrame = ctk.CTkFrame(master=self)
-        logFrame.pack(fill=ctk.BOTH, expand=True, padx=10, pady=10)
+        logFrame.pack(fill=ctk.BOTH, expand=True, anchor=ctk.S, padx=10, pady=10)
         self.logTerminal = ctk.CTkTextbox(master=logFrame, wrap="none", state="disabled")
         self.logTerminal.pack(fill=ctk.BOTH, expand=True, pady=5, padx=5)
 
@@ -178,8 +170,8 @@ class BulkMetricReporting(ctk.CTkFrame):
         # Default to last_export_dir from config when available
         try:
             last_dir = (
-                self.controller.config.get("paths", {}).get("last_export_dir")
-                if isinstance(self.controller.config.get("paths"), dict)
+                self.master.controller.config.get("paths", {}).get("last_export_dir")
+                if isinstance(self.master.controller.config.get("paths"), dict)
                 else None
             )
             start_dir = last_dir if last_dir else self.FH.initDir
@@ -194,8 +186,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.outputDirEntry.configure(state=ctk.DISABLED)
         # Persist last_export_dir for future defaults
         try:
-            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(self.destDirectory)
-            save_config(self.controller.config)
+            self.master.controller.config.paths.last_export_dir = str(self.destDirectory)
         except Exception:
             pass
 
@@ -236,10 +227,10 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.durationLabel.configure(text=f"{int(self.dateDuration.get())} Day(s)")
 
     def get_site_list(self) -> None:
-        if self.controller.auth is None:
+        if self.master.controller.auth is None:
             messagebox.showerror(title="No Login Found!", message="Please login first!")
             return None
-        element = ElementOfTenant(bearer_token=self.controller.auth.access_token)
+        element = ElementOfTenant(bearer_token=self.master.controller.auth.access_token)
         try:
             res = element.request()
             get = threading.Thread(target=self.process_site_list, args=(res,))
@@ -285,8 +276,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         lw.text_view_render(widget=self.logTerminal, log="file saved: " + str(self.FH.savedFile))
         # Remember export dir after save
         try:
-            self.controller.config.setdefault("paths", {})["last_export_dir"] = str(self.destDirectory)
-            save_config(self.controller.config)
+            self.master.controller.config.paths.last_export_dir = str(Path(self.FH.savedFile).parent)
         except Exception:
             pass
         if self.debugState.get():
@@ -296,7 +286,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         self.automateReport.configure(state=ctk.DISABLED)
         thread_count: int = max(4, min(os.cpu_count(), len(self.siteList)))
         data: list = array_split(
-            ary=(self.siteList if not self.controller.env.dev else self.siteList.head(16)),
+            ary=(self.siteList if not self.master.controller.env.dev else self.siteList.head(16)),
             indices_or_sections=thread_count,
         )  # HACK: Get Only first (N) of items for dev purposes
         self.queuedRes = queue.Queue()
@@ -374,7 +364,7 @@ class BulkMetricReporting(ctk.CTkFrame):
 
     async def generate_data(self, tenant: pd.Series | dict, retries: int = 5) -> dict:
         interfaces = get_all_interfaces(
-            bearer_token=self.controller.auth.access_token,
+            bearer_token=self.master.controller.auth.access_token,
             site_id=tenant["site_id"],
             element_id=tenant["id"],
         )
@@ -399,7 +389,7 @@ class BulkMetricReporting(ctk.CTkFrame):
         }
 
         res = system_metric(
-            bearer_token=self.controller.auth.access_token,
+            bearer_token=self.master.controller.auth.access_token,
             body=allSum_payload,
         )
 
@@ -409,7 +399,7 @@ class BulkMetricReporting(ctk.CTkFrame):
             interfaces_payload["filter"]["interface"] = filtered_interfaces
             interfaces_payload["view"] = {"individual": "interface", "summary": True}
             interfaceRes = system_metric(
-                bearer_token=self.controller.auth.access_token,
+                bearer_token=self.master.controller.auth.access_token,
                 body=interfaces_payload,
             )
             filtered_res: dict[str, str | dict] = next(
