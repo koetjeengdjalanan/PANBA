@@ -201,7 +201,31 @@ def load_topology(file_path: Path) -> networkx.Graph:
 
     connections: list = raw_data.get("connections", [])
     for conn in connections:
-        G.add_edge(*conn, type="external")
+        G.add_edge(*conn.get("edge", []), type="external", weight=conn.get("weight", 1))
+
+    adjustment: dict[str, dict[str, list[list[str]]]] = raw_data.get("adjustment", {})
+    node_adjustment = adjustment.get("node")
+    if node_adjustment is not None:
+        for action, value in node_adjustment.items():
+            if value is None or len(value) == 0:
+                continue
+            if action == "add":
+                for node, attrs in value.items():
+                    G.add_node(node, **attrs)
+            if action == "remove":
+                for node in value:
+                    G.remove_node(node)
+    edge_adjustment = adjustment.get("edge")
+    if edge_adjustment is not None:
+        for action, value in edge_adjustment.items():
+            if value is None or len(value) == 0:
+                continue
+            if action == "add":
+                for edge in value:
+                    G.add_edge(*edge)
+            if action == "remove":
+                for edge in value:
+                    G.remove_edge(*edge)
 
     return G
 
@@ -308,23 +332,28 @@ def find_slice(row_input: pd.Series, db: pd.DataFrame) -> pd.Series:
         2
         dtype: object
     """
+    import re
+
+    fqdn_pattern = (
+        r"^(?:https?:\/\/)?(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/.*)?$"
+    )
     masks = {
         "source": (db["start_ip"] <= row_input["src_start_ip"]) & (db["end_ip"] >= row_input["src_end_ip"]),
         "destination": (db["start_ip"] <= row_input["dst_start_ip"]) & (db["end_ip"] >= row_input["dst_end_ip"]),
     }
     results = []
     results.insert(0, str(uuid4()))
-    if row_input[["src_start_ip", "src_end_ip", "dst_start_ip", "dst_end_ip"]].isin([0, -1]).any():
+    if row_input[["src_start_ip", "src_end_ip", "dst_start_ip", "dst_end_ip"]].isin([-1]).any():
         results.extend([None, None])
         return pd.Series(results)
     for direction, mask in masks.items():
         matched_rows = db.loc[mask]
         if not matched_rows.empty:
-            # Construct the zone path string in the format "Firewall1.VSys.zones"
-            # This format can be changed here if the structure changes in the future.
             first_match = matched_rows.iloc[0]
             zone_path = f"{first_match['Firewall1']}.{first_match['VSys']}.{first_match['Zone']}"
             results.append(zone_path)
+        elif re.match(fqdn_pattern, row_input[direction]):
+            results.append("other.unconfigured.Internet")
         else:
             results.append(None)
 

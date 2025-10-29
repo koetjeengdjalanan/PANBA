@@ -156,21 +156,27 @@ class PathFinderOverview(ctk.CTkTabview):
                 widget_address[idx, col_idx].grid(row=idx, column=col_idx, padx=1, pady=1, sticky=ctk.EW)
         return table_address, widget_address
 
-    def _draw_output_table(self):
-        if self.output_data.empty:
+    def _draw_output_table(self) -> None:
+        if any(
+            [
+                not hasattr(self, "output_data"),
+                any(data.empty for data in self.output_data.values()),
+                not isinstance(self.output_data, dict),
+            ]
+        ):
             return
         self._output_table = Treeview(
             master=self.tab("Config Output"),
-            columns=list(self.output_data.columns),
+            columns=list(self.output_data["config_output"].columns),
             show="headings",
             selectmode="browse",
             name="path_finder_output_table",
         )
         self._output_table.pack(fill=ctk.BOTH, expand=True, side=ctk.LEFT, padx=(5, 0), pady=5)
-        for col in self.output_data.columns:
+        for col in self.output_data["config_output"].columns:
             self._output_table.heading(col, text=col)
             self._output_table.column(col, width=100, anchor=ctk.W)
-        for _, row in self.output_data.iterrows():
+        for _, row in self.output_data["config_output"].iterrows():
             self._output_table.insert("", "end", values=tuple(row))
         self._output_table.update_idletasks()
         v_scroll = ctk.CTkScrollbar(
@@ -178,6 +184,7 @@ class PathFinderOverview(ctk.CTkTabview):
         )
         v_scroll.pack(side=ctk.RIGHT, fill=ctk.Y)
         self._output_table.configure(yscrollcommand=v_scroll.set)
+        self.set("Config Output")
 
     def process_finding_path(self):
         """
@@ -222,21 +229,54 @@ class PathFinderOverview(ctk.CTkTabview):
             find_slice, axis=1, db=self.segment_db
         )
         res: list[dict] = []
+        logs: list[pandas.Series] = []
         length = self.input_data.__len__()
         yield 0, length
         for idx, row in self.input_data.iterrows():
             nodes_path = {}
-            if row[["src_zone_str", "dst_zone_str"]].isnull().any():
-                yield idx, length
-                continue
             try:
+                log = pandas.Series(
+                    {
+                        "memo_id": row["memo_id"],
+                        "source": row["source"],
+                        "destination": row["destination"],
+                        "port": row["port"],
+                    }
+                )
+                if (row[["src_start_ip", "src_end_ip", "dst_start_ip", "dst_end_ip"]] < 0).any():
+                    raise ValueError(
+                        f"Invalid {'source' if (row[['src_start_ip', 'src_end_ip']] < 0).any() else 'destination'} IP range!"  # noqa: E501
+                    )
+                if (row[["src_zone_str", "dst_zone_str"]] == "").any() or pandas.isna(
+                    row[["src_zone_str", "dst_zone_str"]]
+                ).any():
+                    raise ValueError(
+                        f"{'Source' if row['src_zone_str'] == '' or row['src_zone_str'] is None else 'Destination'} zone is not found!"  # noqa: E501
+                    )
                 paths = nx.shortest_path(
                     self.topology_graph,
-                    source=row["src_zone_str"].rsplit(".", 1)[0] + ".zones",
-                    target=row["dst_zone_str"].rsplit(".", 1)[0] + ".zones",
+                    source=(
+                        "other.unmanaged.Core-DC"
+                        if row["src_zone_str"] == "other.unmanaged.User"
+                        else (
+                            "other.unconfigured.Internet"
+                            if row["src_zone_str"] == "other.unconfigured.Internet"
+                            else row["src_zone_str"].rsplit(".", 1)[0] + ".zones"
+                        )
+                    ),
+                    target=(
+                        "other.unmanaged.Core-DC"
+                        if row["dst_zone_str"] == "other.unmanaged.User"
+                        else (
+                            "other.unconfigured.Internet"
+                            if row["dst_zone_str"] == "other.unconfigured.Internet"
+                            else row["dst_zone_str"].rsplit(".", 1)[0] + ".zones"
+                        )
+                    ),
                 )
-                if "other.unconfigured.Core" in paths:
-                    paths.remove("other.unconfigured.Core")
+                for core in ["other.unmanaged.Core-DC", "other.unmanaged.Core-DRC", "other.unconfigured.Internet"]:
+                    if core in paths:
+                        paths.remove(core)
                 for path in paths:
                     device, vsys, zone = path.split(".")
                     nodes_path.setdefault(vsys, [])
@@ -258,11 +298,23 @@ class PathFinderOverview(ctk.CTkTabview):
                         for node in nodes_path.values()
                     ]
                 )
-            except nx.NetworkXNoPath as no_path:
-                print(f"No path found for row {idx}: {no_path}")
+                log["status"] = "success"
+                log["log"] = f"Path found: {' -> '.join(paths)}"
+            except Exception as e:
+                print(f"Error processing row {idx} {row['memo_id']}: {e}")
+                log["status"] = "failed"
+                log["log"] = str(e)
             finally:
+                logs.append(log)
                 yield idx, length
                 continue
-        self.output_data = pandas.DataFrame(res)
+        df_cols = self.input_data.columns.tolist()
+        df_cols.remove("memo_id")
+        df_cols.insert(0, "memo_id")
+        logs_df = pandas.DataFrame(logs)
+        self.output_data: dict[str, pandas.DataFrame] = {
+            "config_output": pandas.DataFrame(res),
+            "input_log": logs_df,
+        }
         yield length, length
         self._draw_output_table()

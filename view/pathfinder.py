@@ -12,6 +12,7 @@ import pandas
 from helper.processing import load_topology, splice_ip
 from view.fragments.loading_overlay import load_overlay
 from view.fragments.path_finder_overview import PathFinderOverview
+from view.toplevel.topology_preview import create_graph_preview
 
 if TYPE_CHECKING:
     from dotenv.main import StrPath
@@ -60,6 +61,7 @@ class PathFinder(ctk.CTkFrame):
         super().__init__(master=master, fg_color="transparent")
         self.master: "App" = master  # type: ignore[name-defined]
         self._preview_topology_frame: ctk.CTkToplevel | None = None
+        self.is_concurrent: bool = False
 
         self._source_file_frame()
         self._command_frame()
@@ -102,6 +104,9 @@ class PathFinder(ctk.CTkFrame):
                 expected=[("JSON files", "*.json")],
             ),
         )
+        self.debug_mode = ctk.BooleanVar(
+            master=self, name="path_finder_debug_mode", value=bool(self.master.controller.env.dev)
+        )
 
         ## Segment DB Source File
         self.segment_db_source_file = ctk.StringVar(
@@ -137,20 +142,20 @@ class PathFinder(ctk.CTkFrame):
             bd=0,
             borderwidth=0,
         )
-        self._action_popup.add_command(label="Reload Sources", command=self._reload_sources)
+        self._action_popup.add_command(
+            label="PreView Topology",
+            command=lambda: setattr(self, "_temporary_topology_file", create_graph_preview(graph=self.topology)[1]),
+        )
         self._action_popup.add_command(label="Save Topology as...", command=self._save_topology_as)
-        self._preview_button = ctk.CTkButton(master=self.setting_container, text="View Topology", command=lambda: None)
+        self._preview_button = ctk.CTkButton(master=self.setting_container, text="Load Topology", command=lambda: None)
         self._preview_button.grid(row=3, column=0, columnspan=2, pady=(10, 10))
         self._preview_button.bind("<Button-1>", self._preview_topology)
         self._preview_button.bind("<Button-3>", self._preview_topology)
 
     def _preview_topology(self, event: Event) -> None:
-        from view.toplevel.topology_preview import create_graph_preview
-
         match event.num:
             case 1:
                 self._reload_sources()
-                self._temporary_topology_file = create_graph_preview(graph=self.topology)[1]
             case 3:
                 try:
                     self._action_popup.tk_popup(x=event.x_root, y=event.y_root)
@@ -190,18 +195,22 @@ class PathFinder(ctk.CTkFrame):
                     ov.text_value = "Unsupported file type!"
                     return False
 
-            thread = threading.Thread(target=calls, args=(source,), name="load_data_thread")
-            thread.start()
-            while thread.is_alive():
-                self.master.update()
-                ov.pulse()
-                sleep(0.1)
-            thread.join()
+            if not self.is_concurrent:
+                thread = threading.Thread(target=calls, args=(source,), name="load_data_thread")
+                thread.start()
+                while thread.is_alive():
+                    self.master.update()
+                    ov.pulse()
+                    sleep(0.1)
+                thread.join()
+                self.is_concurrent = False
+            else:
+                calls(source)
         return True
 
     def _file_select(
         self, widget: ctk.CTkEntry, str_var: ctk.StringVar, expected: list[tuple[str, str]], skip_ui: bool = False
-    ) -> None:
+    ) -> str | None:
         file_path = (
             str_var.get()
             if skip_ui
@@ -224,22 +233,31 @@ class PathFinder(ctk.CTkFrame):
                     parent=self.master,
                 ):
                     self._file_select(widget, str_var, expected)
+        return file_path
 
     def _reload_sources(self) -> None:
+        files: list[str] = []
         if self.segment_db.empty:
-            self._file_select(
+            sgmt_file = self._file_select(
                 widget=self._segment_entry,
                 str_var=self.segment_db_source_file,
                 expected=[("CSV files", "*.csv"), ("Excel files", "*.xlsx")],
                 skip_ui=True,
             )
+            if sgmt_file:
+                files.append(sgmt_file)
         if self.topology.number_of_nodes() == 0:
-            self._file_select(
+            topo_file = self._file_select(
                 widget=self._topology_entry,
                 str_var=self.topology_source_file,
                 expected=[("JSON files", "*.json")],
                 skip_ui=True,
             )
+            if topo_file:
+                files.append(topo_file)
+        if len(files) >= 2:
+            self._memo_entry.bind("<Button-1>", lambda e: self._read_memo_entry(e))
+            self._reload_memo_button.configure(state=ctk.NORMAL)
 
     def _save_topology_as(self) -> None:
         from shutil import copyfile
@@ -306,12 +324,13 @@ class PathFinder(ctk.CTkFrame):
         )
         self._memo_entry.xview_moveto(1)
         self._memo_entry.grid(row=0, column=1, sticky="ew", padx=self._padding["pad_x"])
-        self._memo_entry.bind("<Button-1>", lambda e: self._read_memo_entry(e))
-        ctk.CTkButton(
+        self._reload_memo_button = ctk.CTkButton(
             master=commands_table_input_frame,
-            text="Re-Load Memo",
-            command=lambda e: self._read_memo_entry(e, skip_ui=True),
-        ).grid(row=0, column=2, padx=self._padding["pad_x"])
+            text="ReLoad Memo",
+            command=lambda e: self._read_memo_entry(skip_ui=True),
+            state=ctk.DISABLED,
+        )
+        self._reload_memo_button.grid(row=0, column=2, padx=self._padding["pad_x"])
 
         ## Instructions Table Input-Output Frame
         self._instructions_table_frame = ctk.CTkFrame(master=self._command_frame_container, fg_color="transparent")
@@ -326,12 +345,34 @@ class PathFinder(ctk.CTkFrame):
         self._action_button_cluster_frame.columnconfigure(index=0, weight=1)
         self._action_button_cluster_frame.columnconfigure(index=1, weight=1)
         self._action_button_cluster_frame.columnconfigure(index=2, weight=1)
-        self.submit_button = ctk.CTkButton(
+        self._step_button_var = ctk.StringVar(master=self, name="step_button_var", value="Next...")
+        self._command_popup = Menu(
+            master=self,
+            tearoff=False,
+            bg=ctk.ThemeManager.theme["CTkFrame"]["fg_color"][1],
+            fg=ctk.ThemeManager.theme["CTkLabel"]["text_color"][1],
+            bd=0,
+            borderwidth=0,
+        )
+        self._submit_button = ctk.CTkButton(
             master=self._action_button_cluster_frame,
-            text="Action Button",
+            textvariable=self._step_button_var,
             command=self._do_a_breakpoint,
         )
-        self.submit_button.grid(row=0, column=2, padx=self._padding["pad_x"], sticky=ctk.EW)
+        self._submit_button.grid(row=0, column=2, padx=self._padding["pad_x"], sticky=ctk.EW)
+        self._submit_button.bind("<Button-3>", self._memo_right_click_menu)
+
+    def _memo_right_click_menu(self, event: Event) -> None:
+        if event.num != 3:
+            return
+        if len(self._command_popup.entryconfigure(0)) == 0:
+            self._command_popup.add_command(label="Re-Find Path", command=self._find_path)
+            return
+        else:
+            try:
+                self._command_popup.tk_popup(x=event.x_root, y=event.y_root)
+            finally:
+                self._command_popup.grab_release()
 
     def _read_memo_entry(self, *args, **kwargs) -> None:
         def process_memo_entry():
@@ -357,7 +398,9 @@ class PathFinder(ctk.CTkFrame):
                 topology_graph=self.topology,
             )
             self.finder_overview.pack(fill="both", expand=True, padx=10, pady=5)
-            self.submit_button.configure(text="Find Path", command=self._find_path)
+            self._step_button_var.set("Find Path")
+            self._submit_button.configure(command=self._find_path)
+            self._submit_button.bind("<Button-3>", self._memo_right_click_menu)
             for idx, val in enumerate(self.finder_overview.problematic_rows.items()):
                 _ = ctk.CTkFrame(
                     master=self._action_button_cluster_frame,
@@ -398,6 +441,8 @@ class PathFinder(ctk.CTkFrame):
     def _find_path(self) -> None:
         from queue import Queue
 
+        self.is_concurrent = True
+        self._submit_button.configure(state=ctk.DISABLED)
         self._reload_sources()
         progress_queue = Queue()
 
@@ -416,7 +461,9 @@ class PathFinder(ctk.CTkFrame):
                 if progress is None:
                     # Thread completed
                     ov.__exit__(None, None, None)
-                    # self._do_a_breakpoint()
+                    self.is_concurrent = False
+                    self._step_button_var.set("Export Results")
+                    self._submit_button.configure(command=self._export_results, state=ctk.NORMAL)
                     return
                 current, total = progress
                 ov.update_text(f"Finding Paths... ({current}/{total})")
@@ -432,6 +479,33 @@ class PathFinder(ctk.CTkFrame):
 
         # Start polling the queue asynchronously
         self.master.after(50, check_progress)
+
+    def _export_results(self) -> None:
+        from helper.ext_filehandler import status_coloring_fmt
+        from helper.filehandler import FileHandler as FH
+
+        if any(
+            [
+                not hasattr(self.finder_overview, "output_data"),
+                any([df.empty for df in self.finder_overview.output_data.values()]),
+            ]
+        ):
+            messagebox.showwarning(
+                title="No Results",
+                message="No results available to export. Please perform a pathfinding operation first.",
+                parent=self.master,
+            )
+            return
+        if self.master.controller.env.dev:
+            self.finder_overview.output_data["debug_output"] = self.finder_overview.input_data
+        fh = (
+            FH(destDir=self.master.controller.config.paths.last_export_dir)
+            .save_file_loc(fileName="Path_Results.xlsx", dirStr=self.master.controller.config.paths.last_export_dir)
+            .export_excel(data=self.finder_overview.output_data, additional_fmt=status_coloring_fmt)
+            .open_explorer()
+        )
+        self.master.controller.config.paths.last_export_dir = fh.destDir
+        self._do_a_breakpoint()
 
     def _do_a_breakpoint(self) -> None:
         print("Breakpoint reached!")

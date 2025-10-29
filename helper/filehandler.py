@@ -1,12 +1,43 @@
+"""File Handler Module."""
+
 from datetime import datetime
 from pathlib import Path
-from typing import Union, Dict, Any, List
+from tkinter import filedialog as fd
+from typing import Any, Dict, List, Optional, Union
+
 import chardet
 import pandas as pd
-from tkinter import filedialog as fd
 
 
 class FileHandler:
+    """A utility class for handling file operations including file dialogs, encoding detection, and data import/export.
+
+    This class provides methods for:
+    - Selecting files and directories through GUI dialogs
+    - Reading CSV and Excel files into pandas DataFrames
+    - Detecting file encodings
+    - Exporting DataFrames to Excel with auto-fitting columns
+    - Opening file explorer at specific locations
+    - Flattening nested dictionaries
+    Attributes:
+        sourceFile (Path): Path to the source file for reading operations.
+        sourceData (pd.DataFrame): DataFrame containing data read from source file.
+        initDir (Path): Initial directory for file dialogs. Defaults to user's home directory.
+        destDir (Path): Destination directory for file operations. Defaults to current working directory.
+        savedFile (Path): Path where the file was saved. Defaults to './saved.xlsx'.
+        encodingList (list): List of supported file encodings for CSV reading.
+
+    Example:
+        >>> handler = FileHandler()
+        >>> handler.select_file().read_file()
+        >>> handler.save_file_loc().export_excel()
+        >>> handler.open_explorer()
+
+    Note:
+        The class uses method chaining, allowing multiple operations to be performed sequentially.
+        Most methods return 'self' to enable this pattern.
+    """
+
     def __init__(
         self,
         sourceFile: Path = None,
@@ -15,7 +46,7 @@ class FileHandler:
         destDir: Path = Path().cwd(),
         savedFile: Path = Path("./saved.xlsx").absolute(),
     ) -> None:
-        """Handling File Dialogs and File Operations"""
+        """Handling File Dialogs and File Operations."""
         self.sourceFile = sourceFile
         self.sourceData = sourceData
         self.initDir = initDir
@@ -121,25 +152,21 @@ class FileHandler:
             "utf-8-sig",
         ]
 
-    def select_directory(
-        self, dirStr: str | Path = Path().home().absolute()
-    ) -> "FileHandler":
-        """Select Directory / Folder Dialog
+    def select_directory(self, dirStr: str | Path = Path().home().absolute()) -> "FileHandler":
+        """Select Directory / Folder Dialog.
 
         Args:
             dirStr (Path, optional): Defined where the directory or folder should start. Defaults to Path().home().absolute().
 
         Returns:
             FileHandler: FileHandler Class Object
-        """
+        """  # noqa: E501
         destDirectory = fd.askdirectory(
             initialdir=dirStr,
             mustexist=True,
             title="Select Directory / Folder",
         )
-        self.initDir = (
-            Path(destDirectory).absolute() if destDirectory != "" else self.initDir
-        )
+        self.initDir = Path(destDirectory).absolute() if destDirectory != "" else self.initDir
         return self
 
     def save_file_loc(
@@ -149,7 +176,7 @@ class FileHandler:
         timeStamp: bool = True,
         promptDialog: bool = True,
     ) -> "FileHandler":
-        """Select File Location Dialog
+        """Select File Location Dialog.
 
         Args:
             fileName (str, optional): Defined the file output name. Defaults to "EXPORT.xlsx".
@@ -183,7 +210,10 @@ class FileHandler:
         return self
 
     def select_file(self, title: str = "Open Source File") -> "FileHandler":
-        """Select File Dialog
+        """Select File Dialog.
+
+        Args:
+            title (str, optional): Dialog Title. Defaults to "Open Source File".
 
         Returns:
             FileHandler: FileHandler Class Object
@@ -193,14 +223,12 @@ class FileHandler:
             ("Excel Files", "*.xls *.xlsx *.xlsm *.xlsb"),
             ("All Files", "*.*"),
         )
-        res = fd.askopenfilename(
-            title=title, initialdir=self.initDir, filetypes=filetype
-        )
+        res = fd.askopenfilename(title=title, initialdir=self.initDir, filetypes=filetype)
         self.sourceFile = Path(res).absolute() if res != "" else self.sourceFile
         return self
 
     def encoder_detect(self) -> dict | None:
-        """Detect File Encoding
+        """Detect File Encoding.
 
         Returns:
             FileHandler: FileHandler Class Object
@@ -215,7 +243,7 @@ class FileHandler:
                 return None
 
     def read_file(self, skipRows: int = 0) -> "FileHandler":
-        """Read Source File as DataFrame
+        """Read Source File as DataFrame.
 
         Args:
             skipRows (int, optional): How many line should be skipped. Defaults to 0.
@@ -234,9 +262,7 @@ class FileHandler:
             case ".csv":
                 if self.encoder_detect() is None:
                     raise ValueError("Invalid Encoding", self.encoder_detect())
-                self.sourceData = pd.read_csv(
-                    filepath_or_buffer=self.sourceFile, skiprows=skipRows
-                )
+                self.sourceData = pd.read_csv(filepath_or_buffer=self.sourceFile, skiprows=skipRows)
             case ".xlsx" | ".xls" | ".xlsm" | ".xlsb":
                 self.sourceData = pd.read_excel(io=self.sourceFile, skiprows=skipRows)
             case _:
@@ -245,23 +271,24 @@ class FileHandler:
 
     def export_excel(
         self,
-        data: Union[
-            pd.DataFrame, Dict[str, Union[List, pd.DataFrame, Dict[str, Any]]]
-        ] = None,
+        data: Union[pd.DataFrame, Dict[str, Union[List, pd.DataFrame, Dict[str, Any]]]] = None,
+        additional_fmt: Optional[callable] = None,
     ) -> "FileHandler":
-        """Export DataFrame to Excel
+        """Export DataFrame to Excel.
 
         Args:
             data (dict[str, pd.DataFrame  |  dict  |  list] | pd.DataFrame, optional): data to be exported. Defaults to None.
+            additional_fmt (callable, optional): Additional Formatting Function. Defaults to None.
 
         Raises:
             ValueError: Invalid Data Type
 
         Returns:
             FileHandler: FileHandler Class Object
-        """
+        """  # noqa: E501
         data = data if data is not None else self.sourceData
         writer = pd.ExcelWriter(path=self.savedFile, engine="xlsxwriter")
+        workbook = writer.book
 
         def _manual_autofit(ws, df: pd.DataFrame):
             for col_idx, col_name in enumerate(df.columns):
@@ -286,33 +313,33 @@ class FileHandler:
             except Exception:
                 _manual_autofit(ws, df)
 
-        match data:
-            case pd.DataFrame():
-                data.to_excel(
-                    excel_writer=writer,
-                    sheet_name="Sheet1",
-                    index=False,
-                    freeze_panes=(1, 0),
+        if isinstance(data, pd.DataFrame):
+            data = {"Sheet1": data}
+
+        for key in data.keys():
+            if (
+                data[key] is None
+                or (isinstance(data[key], (list, dict)) and len(data[key]) == 0)
+                or (hasattr(data[key], "empty") and data[key].empty)
+            ):
+                continue
+            pd.DataFrame(data=data[key]).to_excel(
+                excel_writer=writer,
+                sheet_name=key,
+                index=False,
+                freeze_panes=(1, 0),
+            )
+            if additional_fmt is not None:
+                workbook, writer.sheets[key] = additional_fmt(
+                    workbook=workbook, worksheet=writer.sheets[key], data=data[key]
                 )
-                _apply_autofit("Sheet1", data)
-            case dict():
-                for key in data.keys():
-                    pd.DataFrame(data=data[key]).to_excel(
-                        excel_writer=writer,
-                        sheet_name=key,
-                        index=False,
-                        freeze_panes=(1, 0),
-                    )
-                    _apply_autofit(key, pd.DataFrame(data=data[key]))
-            case _:
-                raise ValueError("Invalid Data Type", type(data))
+            _apply_autofit(key, pd.DataFrame(data=data[key]))
+
         writer.close()
         return self
 
-    def flatten_dict(
-        self, data: dict, parent_key: str = "", sep: str = "_", level: int = 1
-    ) -> dict:
-        """Flatten a nested dictionary
+    def flatten_dict(self, data: dict, parent_key: str = "", sep: str = "_", level: int = 1) -> dict:
+        """Flatten a nested dictionary.
 
         Args:
             data (dict): Data with nested dictionary
@@ -327,23 +354,19 @@ class FileHandler:
         for key, value in data.items():
             new_key = f"{parent_key}{sep}{key}" if parent_key != "" else key
             if isinstance(value, dict) and level > 0:
-                items.extend(
-                    self.flatten_dict(
-                        data=value, parent_key=new_key, level=level - 1
-                    ).items()
-                )
+                items.extend(self.flatten_dict(data=value, parent_key=new_key, level=level - 1).items())
             else:
                 items.append((new_key, value))
         return dict(items)
 
     def open_explorer(self) -> "FileHandler":
-        """Open File Explorer
+        """Open File Explorer.
 
         Returns:
             FileHandler: FileHandler Class Object
         """
-        from subprocess import run
         from platform import system
+        from subprocess import run
 
         match system():
             case "Windows":
