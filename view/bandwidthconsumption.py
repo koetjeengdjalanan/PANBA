@@ -1,31 +1,52 @@
+"""Bandwidth Consumption View Module."""
+
 import traceback
-from pathlib import Path
+from typing import TYPE_CHECKING
+
 import customtkinter as ctk
 import pandas as pd
+
+import helper.logwriter as lw
 from helper.api.getlist import RemoteNetworkBandwidth
 from helper.filehandler import FileHandler
-import helper.logwriter as lw
 from helper.settings.apisettings import BWConsSetting
-from helper.config import save_config
+
+if TYPE_CHECKING:
+    from main import App
 
 
 class BandwidthConsumption(ctk.CTkFrame):
-    def __init__(self, master, controller):
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
-        self.controller = controller
+    # Class docstring
+    """
+    BandwidthConsumption(ctk.CTkFrame).
+
+    A custom frame that provides a user interface for configuring and exporting
+    network bandwidth consumption data. It includes:
+    - Output file path selection with persistence of last used directory.
+    - Duration selection slider for filtering data by last N days.
+    - Checkboxes to select properties to include in the export.
+    - A log view to display status messages and errors.
+
+    Attributes:
+        controller (AppController): Reference to the application controller for
+            accessing configuration and authentication.
+        FH (FileHandler): Handles file selection and exporting data to Excel.
+        outputPath (ctk.StringVar): Holds the path of the selected output file.
+        daysAgo (ctk.IntVar): Duration in days for data filtering (default 90).
+        logBox (ctk.CTkTextbox): Textbox for displaying log messages.
+    """
+
+    def __init__(self, master: ctk.CTk):
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
+        self.master: "App" = master
         self.FH = FileHandler()
         # Prefill output path from config if available
-        try:
-            paths_cfg = (
-                self.controller.config.get("paths")
-                if isinstance(self.controller.config.get("paths"), dict)
-                else None
-            )
-            if paths_cfg and paths_cfg.get("last_export_dir"):
-                self.FH.destDir = Path(paths_cfg.get("last_export_dir"))
-                self.FH.initDir = Path(paths_cfg.get("last_export_dir"))
-        except Exception:
-            pass
+        self.FH.destDir = self.master.controller.config.paths.last_export_dir
+        self.FH.initDir = self.master.controller.config.paths.last_export_dir
         self.outputPath: ctk.StringVar = ctk.StringVar(value=str(self.FH.savedFile))
         self.daysAgo: ctk.IntVar = ctk.IntVar(value=90)
         self.leftSetupFrame, self.rightSetupFrame = self.__setup_frame()
@@ -47,25 +68,16 @@ class BandwidthConsumption(ctk.CTkFrame):
     def __log_frame(self):
         logFrame = ctk.CTkFrame(master=self)
         logFrame.pack(fill=ctk.BOTH, expand=True, anchor=ctk.S, padx=10, pady=10)
-        ctk.CTkLabel(
-            master=logFrame, text="Log Configuration", font=("Arial", 12, "bold")
-        ).pack(fill=ctk.X, expand=True, pady=5, anchor=ctk.W)
+        ctk.CTkLabel(master=logFrame, text="Log Configuration", font=("Arial", 12, "bold")).pack(
+            fill=ctk.X, expand=True, pady=5, anchor=ctk.W
+        )
         self.logBox = ctk.CTkTextbox(master=logFrame, state="disabled")
         self.logBox.pack(fill=ctk.BOTH, expand=True, pady=(0, 5), padx=5)
 
     def __output_config(self):
         def set_output_path():
             # Use last_export_dir if present
-            dir_hint = None
-            try:
-                paths_cfg = (
-                    self.controller.config.get("paths")
-                    if isinstance(self.controller.config.get("paths"), dict)
-                    else None
-                )
-                dir_hint = paths_cfg.get("last_export_dir") if paths_cfg else None
-            except Exception:
-                dir_hint = None
+            dir_hint = self.master.controller.config.paths.last_export_dir
             val = self.FH.save_file_loc(dirStr=dir_hint or self.FH.destDir).savedFile
             self.outputPath.set(value=str(val))
             lw.text_view_render(widget=self.logBox, log=f"File path set to {val}")
@@ -75,9 +87,7 @@ class BandwidthConsumption(ctk.CTkFrame):
             datePickerFrame = ctk.CTkFrame(master=outputFrame, fg_color="transparent")
             datePickerFrame.pack(fill=ctk.X, expand=True, pady=5)
             datePickerFrame.grid_columnconfigure(index=1, weight=3)
-            ctk.CTkLabel(master=datePickerFrame, text="Duration").grid(
-                row=0, column=0, sticky=ctk.W, pady=5, padx=5
-            )
+            ctk.CTkLabel(master=datePickerFrame, text="Duration").grid(row=0, column=0, sticky=ctk.W, pady=5, padx=5)
             ctk.CTkSlider(
                 master=datePickerFrame,
                 variable=self.daysAgo,
@@ -85,32 +95,24 @@ class BandwidthConsumption(ctk.CTkFrame):
                 to=90,
                 number_of_steps=89,
             ).grid(row=0, column=1, sticky=ctk.EW, pady=5)
-            ctk.CTkLabel(master=datePickerFrame, text="Day(s)").grid(
-                row=0, column=2, sticky=ctk.E, pady=5, padx=(5, 0)
-            )
+            ctk.CTkLabel(master=datePickerFrame, text="Day(s)").grid(row=0, column=2, sticky=ctk.E, pady=5, padx=(5, 0))
             ctk.CTkLabel(master=datePickerFrame, textvariable=self.daysAgo).grid(
                 row=0, column=3, sticky=ctk.E, pady=5, padx=5
             )
 
         outputFrame = ctk.CTkFrame(master=self.rightSetupFrame, fg_color="transparent")
         outputFrame.pack(fill=ctk.X, expand=True, anchor=ctk.N, padx=10, pady=10)
-        ctk.CTkLabel(master=outputFrame, text="Output File Path").pack(
-            fill=ctk.X, expand=True, pady=5
-        )
-        outputEntry = ctk.CTkEntry(
-            master=outputFrame, textvariable=self.outputPath, state=ctk.DISABLED
-        )
+        ctk.CTkLabel(master=outputFrame, text="Output File Path").pack(fill=ctk.X, expand=True, pady=5)
+        outputEntry = ctk.CTkEntry(master=outputFrame, textvariable=self.outputPath, state=ctk.DISABLED)
         outputEntry.pack(fill=ctk.X, expand=True, pady=5)
         outputEntry.xview_moveto(1)
         outputEntry.bind(sequence="<Button-1>", command=lambda x: set_output_path())
-        ctk.CTkLabel(master=outputFrame, text="Duration").pack(
-            fill=ctk.X, expand=True, pady=5
-        )
+        ctk.CTkLabel(master=outputFrame, text="Duration").pack(fill=ctk.X, expand=True, pady=5)
         date_picker()
         ctk.CTkButton(
             master=outputFrame,
             text="Export",
-            command=self.export_data,
+            command=self.__export_data,
         ).pack(fill=ctk.X, expand=True, pady=5)
 
     def __prop_select(self):
@@ -138,12 +140,8 @@ class BandwidthConsumption(ctk.CTkFrame):
                 padx=5,
             )
 
-    def export_data(self):
-        propList = [
-            {"property": prop}
-            for prop in BWConsSetting.propState
-            if BWConsSetting.propState[prop]
-        ]
+    def __export_data(self):
+        propList = [{"property": prop} for prop in BWConsSetting.propState if BWConsSetting.propState[prop]]
         lw.text_view_render(
             widget=self.logBox,
             log=f"Count of properties selected: {len(propList)} & Days ago: {self.daysAgo.get()}",
@@ -162,28 +160,14 @@ class BandwidthConsumption(ctk.CTkFrame):
         }
         lw.text_view_render(widget=self.logBox, log="Requesting Data")
         try:
-            rm = RemoteNetworkBandwidth(
-                bearer_token=self.controller.authRes["data"]["access_token"], body=body
-            )
+            rm = RemoteNetworkBandwidth(bearer_token=self.master.controller.auth.access_token, body=body)
             res = rm.request()["data"]["data"]
             data = pd.DataFrame(res)
-            lw.text_view_render(
-                widget=self.logBox, log=f"Data Received\nCount: {len(data)}"
-            )
+            lw.text_view_render(widget=self.logBox, log=f"Data Received\nCount: {len(data)}")
             self.FH.export_excel(data=data)
             lw.text_view_render(
                 widget=self.logBox,
                 log=f"SUCCESS! Data Exported to {self.FH.savedFile}",
             )
-            # Persist last export directory
-            try:
-                self.controller.config.setdefault("paths", {})["last_export_dir"] = str(
-                    Path(self.FH.savedFile).parent
-                )
-                save_config(self.controller.config)
-            except Exception:
-                pass
         except Exception as e:
-            lw.text_view_render(
-                widget=self.logBox, log=f"ERROR! {e}\n{traceback.format_exc()}"
-            )
+            lw.text_view_render(widget=self.logBox, log=f"ERROR! {e}\n{traceback.format_exc()}")

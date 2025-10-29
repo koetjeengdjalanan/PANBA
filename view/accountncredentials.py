@@ -1,64 +1,84 @@
-import customtkinter as ctk
-from tkinter import messagebox
-from PIL import Image
-from threading import Thread
+"""Account and Credentials View Module."""
 
-from helper.api.auth import Login, Profile
+from threading import Thread
+from tkinter import messagebox
+from typing import TYPE_CHECKING
+
+import customtkinter as ctk
+from PIL import Image
+
 from assets.getfile import GetFile
+from helper.api.auth import Login, Profile
 from helper.config import decrypt_secret, encrypt_secret, save_config
+from models import AuthenticationProfile
+
+if TYPE_CHECKING:
+    from main import App
 
 
 class AccountNCredentials(ctk.CTkFrame):
-    def __init__(self, master, controller):
-        super().__init__(master=master, fg_color="transparent", corner_radius=None)
+    """A CustomTkinter frame for handling user authentication.
+
+    This class creates the user interface for the login screen, including
+    input fields for username, secret, and TSG ID. It manages user
+    interactions such as entering credentials, initiating the login process,
+    and opting to save credentials for future sessions. Upon successful
+    login, it locks the input fields and schedules a periodic token refresh.
+
+    Attributes:
+        controller (AppController): The main application controller instance, used
+            to manage application state and data.
+        username (ctk.StringVar): The tkinter variable bound to the username entry field.
+        secret (ctk.StringVar): The tkinter variable bound to the secret entry field.
+        tsgId (ctk.StringVar): The tkinter variable bound to the TSG ID entry field.
+        status (ctk.StringVar): The tkinter variable for displaying status messages
+            (e.g., "Logging In...", "Login Success").
+        rememberMe (ctk.BooleanVar): The tkinter variable bound to the "Remember me"
+            checkbox.
+    """
+
+    def __init__(self, master: ctk.CTk):
+        super().__init__(
+            master=master,
+            fg_color=ctk.ThemeManager.theme["CTk"]["fg_color"],
+            corner_radius=None,
+        )
+        self.master: "App" = master  # type: ignore[name-defined]
 
         ### Root Frame ###
-        self.root = ctk.CTkFrame(
-            master=self, fg_color="transparent", corner_radius=None
-        )
+        self.root = ctk.CTkFrame(master=self, fg_color="transparent", corner_radius=None)
         self.root.pack(fill="both", expand=True)
-        self.controller = controller
         self.getFile = GetFile
-        # print(self.controller.env)
+        # print(self.master.controller.env)
 
         # Typed tkinter variables
         self.username: ctk.StringVar = ctk.StringVar()
         self.secret: ctk.StringVar = ctk.StringVar()
         self.tsgId: ctk.StringVar = ctk.StringVar()
         self.status: ctk.StringVar = ctk.StringVar()
-        self.rememberMe: ctk.BooleanVar = ctk.BooleanVar(
-            value=bool(controller.config.get("ui", {}).get("remember_me", True))
-        )
+        self.rememberMe: ctk.BooleanVar = ctk.BooleanVar(value=self.master.controller.config.ui.remember_me)
 
         ### Logo ###
         logo = ctk.CTkImage(
-            dark_image=Image.open(
-                self.getFile.getAssets(file_name="PANLogo(Dark).png")
-            ),
+            dark_image=Image.open(self.getFile.getAssets(file_name="PANLogo(Dark).png")),
             light_image=Image.open(self.getFile.getAssets(file_name="PANLogo.png")),
             size=(700, 128),
         )
         ctk.CTkLabel(
             master=self.root,
             image=logo,
-            text=None,
+            text="",
         ).pack(anchor="center", fill="x", expand=True)
 
         ### Credentials Input ###
         credentialsFrame = ctk.CTkFrame(master=self, fg_color="transparent")
         credentialsFrame.pack(anchor="n", fill="y", expand=True)
-        ctk.CTkLabel(
-            master=credentialsFrame, text="User Credentials", font=("arial", 32)
-        ).grid(padx=5, pady=5, column=0, row=0, columnspan=4, sticky="nsew")
-        ctk.CTkLabel(master=credentialsFrame, text="User Name").grid(
-            padx=5, pady=5, column=0, row=1, sticky="w"
+        ctk.CTkLabel(master=credentialsFrame, text="User Credentials", font=("arial", 32)).grid(
+            padx=5, pady=5, column=0, row=0, columnspan=4, sticky="nsew"
         )
-        ctk.CTkLabel(master=credentialsFrame, text="Secret").grid(
-            padx=5, pady=5, column=0, row=2, sticky="w"
-        )
-        ctk.CTkLabel(master=credentialsFrame, text="TSG Id").grid(
-            padx=5, pady=5, column=0, row=3, sticky="w"
-        )
+        ctk.CTkLabel(master=credentialsFrame, text="User Name").grid(padx=5, pady=5, column=0, row=1, sticky="w")
+        ctk.CTkLabel(master=credentialsFrame, text="Secret").grid(padx=5, pady=5, column=0, row=2, sticky="w")
+        ctk.CTkLabel(master=credentialsFrame, text="TSG Id").grid(padx=5, pady=5, column=0, row=3, sticky="w")
         self.nameField = ctk.CTkEntry(
             master=credentialsFrame,
             justify="left",
@@ -74,31 +94,23 @@ class AccountNCredentials(ctk.CTkFrame):
             show="*",
         )
         self.secretField.grid(padx=5, pady=5, row=2, column=1, sticky="e", columnspan=3)
-        self.tsgIdField = ctk.CTkEntry(
-            master=credentialsFrame, justify="left", textvariable=self.tsgId, width=400
-        )
+        self.tsgIdField = ctk.CTkEntry(master=credentialsFrame, justify="left", textvariable=self.tsgId, width=400)
         self.tsgIdField.grid(padx=5, pady=5, row=3, column=1, sticky="e", columnspan=3)
         self.clearButton = ctk.CTkButton(
             master=credentialsFrame,
             text="Clear",
             fg_color="gray25",
             hover_color="grey22",
-            command=self.clear_entry,
+            command=self.__clear_entry,
         )
         self.clearButton.grid(pady=5, column=2, row=4, sticky="e")
-        ctk.CTkCheckBox(
-            master=credentialsFrame, text="Remember me", variable=self.rememberMe
-        ).grid(pady=5, column=0, row=4, sticky="w")
-        self.logInButton = ctk.CTkButton(
-            master=credentialsFrame, text="Log In", command=self.login
+        ctk.CTkCheckBox(master=credentialsFrame, text="Remember me", variable=self.rememberMe).grid(
+            pady=5, column=0, row=4, sticky="w"
         )
+        self.logInButton = ctk.CTkButton(master=credentialsFrame, text="Log In", command=self.login)
         self.logInButton.grid(pady=5, column=3, row=4, sticky="e")
-        self.workingLabel = ctk.CTkLabel(
-            master=credentialsFrame, textvariable=self.status
-        )
-        self.workingLabel.grid(
-            padx=5, pady=5, column=0, row=5, sticky="w", columnspan=4
-        )
+        self.workingLabel = ctk.CTkLabel(master=credentialsFrame, textvariable=self.status)
+        self.workingLabel.grid(padx=5, pady=5, column=0, row=5, sticky="w", columnspan=4)
 
         ### Populate Entry ###
         # Populate fields shortly after render
@@ -107,18 +119,12 @@ class AccountNCredentials(ctk.CTkFrame):
     def __populate_entry(self) -> None:
         """Prefill credential fields from .env (fast) then config (robust)."""
         try:
-            env = self.controller.env or {}
-            # .env first (dev convenience)
-            if env.get("userName"):
-                self.nameField.delete(0, ctk.END)
-                self.nameField.insert(0, env.get("userName"))
-            if env.get("secret"):
-                self.secretField.delete(0, ctk.END)
-                self.secretField.insert(0, env.get("secret"))
-            if env.get("tsgId"):
-                self.tsgIdField.delete(0, ctk.END)
-                self.tsgIdField.insert(0, env.get("tsgId"))
-            # Config fallback (persisted between runs)
+            self.nameField.delete(0, ctk.END)
+            self.nameField.insert(0, self.master.controller.env.userName)
+            self.tsgIdField.delete(0, ctk.END)
+            self.tsgIdField.insert(0, self.master.controller.env.tsgId)
+            self.secretField.delete(0, ctk.END)
+            self.secretField.insert(0, self.master.controller.env.secret)
             self._prefill_from_config()
         except Exception:
             # Silently ignore prefill errors to avoid blocking UI
@@ -126,11 +132,10 @@ class AccountNCredentials(ctk.CTkFrame):
 
     def _prefill_from_config(self) -> None:
         """Fill fields from persisted config using DPAPI to decrypt secret."""
-        cfg = self.controller.config
-        auth = cfg.get("auth", {}) if isinstance(cfg.get("auth"), dict) else {}
-        username = auth.get("username")
-        tsg_id = auth.get("tsg_id")
-        secret_enc = auth.get("secret_enc", "")
+        auth_config = getattr(self.master.controller.config, "auth", None)
+        username: str = getattr(auth_config, "username", "")
+        tsg_id: str = getattr(auth_config, "tsg_id", "")
+        secret_enc: str = getattr(auth_config, "secret_enc", "")
         if username:
             self.nameField.delete(0, ctk.END)
             self.nameField.insert(0, str(username))
@@ -147,14 +152,14 @@ class AccountNCredentials(ctk.CTkFrame):
                 # Ignore decryption errors; user can retype
                 pass
 
-    def clear_entry(self) -> None:
+    def __clear_entry(self) -> None:
         self.username.set("")
         self.secret.set("")
         self.tsgId.set("")
         self.status.set("")
         self.workingLabel.configure(require_redraw=True)
 
-    def lock_creds(self) -> None:
+    def __lock_creds(self) -> None:
         self.nameField.configure(state=ctk.DISABLED)
         self.secretField.configure(state=ctk.DISABLED)
         self.tsgIdField.configure(state=ctk.DISABLED)
@@ -162,6 +167,7 @@ class AccountNCredentials(ctk.CTkFrame):
         self.logInButton.configure(state=ctk.DISABLED)
 
     def login(self) -> None:
+        """Handle user login and token refresh scheduling."""
         if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
             self.status.set("Please Fill All Credentials")
             return None
@@ -170,53 +176,61 @@ class AccountNCredentials(ctk.CTkFrame):
             auth = Login(
                 username=self.username.get(),
                 secret=self.secret.get(),
-                tsg_id=self.tsgId.get(),
+                tsg_id=int(self.tsgId.get()),
             )
             self.status.set("Getting Profile...")
-            self.controller.authRes = auth.request()
-            profile = Profile(
-                bearer_token=self.controller.authRes["data"]["access_token"]
+            login_res = auth.request()["data"]
+            profile = Profile(bearer_token=login_res["access_token"])
+            profile_res = profile.request()["data"]
+            self.master.controller.auth = AuthenticationProfile(
+                access_token=login_res["access_token"],
+                scope=login_res["scope"],
+                expire_in=login_res["expires_in"] * 995,
+                tenant_id=profile_res["tenant_id"],
+                session_id=profile_res["session_id"],
             )
-            self.controller.resProfile = profile.request()
             self.status.set("Login Success")
             self.master.activate_menu()
-            self.lock_creds()
+            self.__lock_creds()
             # Persist credentials and preference if enabled
             self._persist_credentials()
             Thread(
                 target=self.after,
                 args=(
-                    (self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1)
-                    * 1000,
+                    # (self.master.controller.authRes.get("data").get("expires_in", 60 * 15) - 1)
+                    self.master.controller.auth.expire_in,
                     self.refresh_token,
                 ),
                 daemon=True,
             ).start()
         except Exception as error:
-            messagebox.showerror(title="Something Went Wrong!", message=error)
+            messagebox.showerror(title="Something Went Wrong!", message=str(error))
             self.status.set("Logging In Failed")
 
     def refresh_token(self) -> None:
-        expires_in = (
-            self.controller.authRes.get("data").get("expires_in", 60 * 15) - 1
-        ) * 1000
+        """Refresh bearer token before expiry."""
         if not all([self.username.get(), self.secret.get(), self.tsgId.get()]):
             return None
         try:
             auth = Login(
                 username=self.username.get(),
                 secret=self.secret.get(),
-                tsg_id=self.tsgId.get(),
+                tsg_id=int(self.tsgId.get()),
             )
-            self.controller.authRes = auth.request()
-            profile = Profile(
-                bearer_token=self.controller.authRes["data"]["access_token"]
+            login_res = auth.request()["data"]
+            profile = Profile(bearer_token=login_res["access_token"])
+            profile_res = profile.request()["data"]
+            self.master.controller.auth = AuthenticationProfile(
+                access_token=login_res["access_token"],
+                scope=login_res["scope"],
+                expire_in=login_res["expires_in"] * 995,
+                tenant_id=profile_res["tenant_id"],
+                session_id=profile_res["session_id"],
             )
-            self.controller.resProfile = profile.request()
         except Exception as error:
-            messagebox.showerror(title="Something Went Wrong!", message=error)
+            messagebox.showerror(title="Something Went Wrong!", message=str(error))
             return None
-        self.after(expires_in, self.refresh_token)
+        self.after(self.master.controller.auth.expire_in, self.refresh_token)
 
     def _persist_credentials(self) -> None:
         """Persist current credentials to config if 'Remember me' is enabled.
@@ -226,17 +240,14 @@ class AccountNCredentials(ctk.CTkFrame):
         """
         try:
             # Update remember_me preference
-            self.controller.config.setdefault("ui", {})["remember_me"] = bool(
-                self.rememberMe.get()
-            )
+            self.master.controller.config.ui.remember_me = bool(self.rememberMe.get())
             if not self.rememberMe.get():
                 return
             # Write auth fields
-            auth = self.controller.config.setdefault("auth", {})
-            auth["username"] = self.username.get()
-            auth["tsg_id"] = self.tsgId.get()
-            auth["secret_enc"] = encrypt_secret(self.secret.get())
-            save_config(self.controller.config)
+            self.master.controller.config.auth.username = self.username.get()
+            self.master.controller.config.auth.tsg_id = self.tsgId.get()
+            self.master.controller.config.auth.secret_enc = encrypt_secret(self.secret.get())
+            save_config(self.master.controller.config)
         except Exception:
             # Do not fail login if persistence fails
             pass
